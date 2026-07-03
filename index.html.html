@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Medidor Óptico - Distância Pupilar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            touch-action: manipulation;
+        }
+        .step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .btn-primary {
+            background-color: #2563eb;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            width: 100%;
+            text-align: center;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-primary:disabled { background-color: #93c5fd; cursor: not-allowed; }
+        .btn-secondary {
+            background-color: #f3f4f6;
+            color: #374151;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            width: 100%;
+            text-align: center;
+            margin-top: 0.5rem;
+        }
+        #videoContainer {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 3/4;
+            background: #000;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+        #videoElement {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .guide-overlay {
+            position: absolute;
+            top: 20%;
+            left: 15%;
+            right: 15%;
+            height: 12%;
+            border: 3px dashed rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        .guide-label {
+            position: absolute;
+            top: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        .capture-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: white;
+            border: 4px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .capture-btn:active {
+            transform: translateX(-50%) scale(0.9);
+        }
+        .capture-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .distance-panel {
+            position: absolute;
+            bottom: 100px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: white;
+        }
+        .distance-value {
+            font-size: 28px;
+            font-weight: 700;
+            transition: color 0.3s;
+        }
+        .distance-value.optimal { color: #10b981; }
+        .distance-value.too-close { color: #ef4444; }
+        .distance-value.too-far { color: #f59e0b; }
+        .distance-bar {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        .distance-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: all 0.3s;
+        }
+        .distance-bar-optimal {
+            position: absolute;
+            height: 100%;
+            background: rgba(16, 185, 129, 0.3);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10">
+        <div class="max-w-md mx-auto flex items-center justify-center">
+            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            <h1 class="text-xl font-bold">Medidor Óptico</h1>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-4 max-w-md mx-auto w-full">
+        
+        <!-- Step 1: Welcome -->
+        <div id="step1" class="step active">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-2xl font-bold text-slate-900 mb-4">Medição de Distância Pupilar (DP)</h2>
+                <p class="text-slate-600 mb-6">Obtenha sua medida de DP com precisão profissional usando seu smartphone e um cartão de referência.</p>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">1</div>
+                        <p class="text-sm text-slate-700">Posicione um cartão de crédito na testa, acima das sobrancelhas.</p>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">2</div>
+                        <p class="text-sm text-slate-700">A câmera abrirá automaticamente. Alinhe o cartão no guia e mantenha a distância indicada.</p>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">3</div>
+                        <p class="text-sm text-slate-700">Quando a distância estiver correta (verde), toque no botão de captura.</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-200 pt-6 mb-6">
+                    <h3 class="text-sm font-semibold text-slate-900 mb-3">Dados da Medição</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Nome do Paciente</label>
+                            <input type="text" id="patientName" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm" placeholder="Ex: João Silva">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Data da Medição</label>
+                            <input type="date" id="measurementDate" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="startCamera()" class="btn-primary">Iniciar Medição</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Live Camera -->
+        <div id="step2" class="step">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Posicione para Captura</h2>
+                <p class="text-xs text-slate-600 mb-3 text-center">Alinhe o cartão no guia retangular. A distância ideal é <strong>35-45 cm</strong>.</p>
+                
+                <div id="videoContainer">
+                    <video id="videoElement" autoplay playsinline></video>
+                    <canvas id="analysisCanvas" style="display:none;"></canvas>
+                    
+                    <!-- Guide overlay -->
+                    <div class="guide-overlay" id="guideOverlay">
+                        <div class="guide-label">Posicione o cartão aqui</div>
+                    </div>
+                    
+                    <!-- Distance panel -->
+                    <div class="distance-panel">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+                                <span class="text-sm font-medium">Distância:</span>
+                            </div>
+                            <div class="distance-value" id="liveDistanceValue">-- cm</div>
+                        </div>
+                        <div class="distance-bar">
+                            <div class="distance-bar-optimal" style="left: 35%; width: 25%;"></div>
+                            <div class="distance-bar-fill" id="distanceBarFill" style="width: 0%; background: #ef4444;"></div>
+                        </div>
+                        <p class="text-xs mt-2 text-center" id="liveDistanceStatus">Aguardando análise...</p>
+                    </div>
+                    
+                    <!-- Capture button -->
+                    <button class="capture-btn" id="captureBtn" onclick="captureImage()" disabled>
+                        <div class="w-full h-full rounded-full border-4 border-blue-500"></div>
+                    </button>
+                </div>
+
+                <div class="flex gap-3 mt-4">
+                    <button onclick="stopCameraAndGoBack()" class="btn-secondary flex-1">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Calibration -->
+        <div id="step3" class="step">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Passo 1: Calibração</h2>
+                <p class="text-sm text-slate-600 mb-2 text-center">Arraste os pontos <span class="text-blue-600 font-bold">azuis</span> para as extremidades do cartão de referência.</p>
+                <p class="text-xs text-blue-600 bg-blue-50 py-1 px-3 rounded-full inline-block mx-auto mb-4 border border-blue-100">💡 Dica: O marcador aparecerá logo acima do seu dedo.</p>
+                
+                <div class="relative w-full overflow-hidden rounded-lg bg-slate-100" style="aspect-ratio: 4/3;">
+                    <canvas id="calibrationCanvas" class="w-full h-full block"></canvas>
+                </div>
+
+                <div class="flex gap-3 mt-4">
+                    <button onclick="goToStep(2)" class="btn-secondary flex-1">Recapturar</button>
+                    <button id="btnToStep4" onclick="goToStep(4)" class="btn-primary flex-1" disabled>Próximo</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Measurement -->
+        <div id="step4" class="step">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Passo 2: Medição</h2>
+                <p class="text-sm text-slate-600 mb-2 text-center">Arraste os pontos <span class="text-emerald-600 font-bold">verdes</span> para o centro exato de cada pupila.</p>
+                <p class="text-xs text-emerald-700 bg-emerald-50 py-1 px-3 rounded-full inline-block mx-auto mb-4 border border-emerald-100">💡 Dica: O marcador aparecerá logo acima do seu dedo.</p>
+                
+                <div class="relative w-full overflow-hidden rounded-lg bg-slate-100" style="aspect-ratio: 4/3;">
+                    <canvas id="measurementCanvas" class="w-full h-full block"></canvas>
+                </div>
+
+                <div class="flex gap-3 mt-4">
+                    <button onclick="goToStep(3)" class="btn-secondary flex-1">Voltar</button>
+                    <button id="btnToStep5" onclick="calculateAndShowResult()" class="btn-primary flex-1" disabled>Calcular DP</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 5: Result -->
+        <div id="step5" class="step">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 mb-2">Medição Concluída</h2>
+                
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 text-left">
+                    <p class="text-xs text-slate-500 mb-1">Paciente</p>
+                    <p id="resultName" class="text-base font-semibold text-slate-900 mb-3">--</p>
+                    <p class="text-xs text-slate-500 mb-1">Data</p>
+                    <p id="resultDate" class="text-base font-semibold text-slate-900 mb-4">--</p>
+                    <p class="text-xs text-slate-500 mb-1">Distância Pupilar (DP)</p>
+                    <div class="flex items-baseline">
+                        <span id="resultValue" class="text-4xl font-bold text-blue-600">--</span>
+                        <span class="text-lg text-slate-500 ml-1">mm</span>
+                    </div>
+                </div>
+
+                <button onclick="shareWhatsApp()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-lg w-full flex items-center justify-center mb-3 transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    Compartilhar no WhatsApp
+                </button>
+
+                <div class="text-xs text-slate-500 mb-6 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                    <strong>Nota:</strong> Esta é uma estimativa baseada em referência visual. Para prescrições médicas, consulte sempre um oftalmologista ou óptico profissional.
+                </div>
+
+                <button onclick="resetApp()" class="btn-secondary">Nova Medição</button>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="p-4 text-center text-xs text-slate-400">
+        &copy; 2026 Medidor Óptico. Ferramenta de auxílio, não substitui avaliação profissional.
+    </footer>
+
+    <script>
+        // State
+        let currentStep = 1;
+        let image = new Image();
+        let imgNaturalWidth = 0;
+        let imgNaturalHeight = 0;
+        let videoStream = null;
+        let analysisInterval = null;
+        
+        // Calibration points
+        let refPoints = [{x: 0.3, y: 0.2}, {x: 0.7, y: 0.2}];
+        let activeRefPoint = -1;
+
+        // Measurement points
+        let pupilPoints = [{x: 0.4, y: 0.5}, {x: 0.6, y: 0.5}];
+        let activePupilPoint = -1;
+
+        const STANDARD_CARD_WIDTH_MM = 85.6;
+
+        // Camera functions
+        async function startCamera() {
+            // Check if camera API is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.log('Camera API not available, using fallback upload');
+                showUploadFallback();
+                return;
+            }
+            
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('videoElement');
+                video.srcObject = videoStream;
+                
+                goToStep(2);
+                
+                // Start real-time distance analysis
+                setTimeout(startDistanceAnalysis, 500);
+                
+            } catch (err) {
+                console.error('Erro ao acessar câmera:', err);
+                // Show fallback upload option
+                showUploadFallback();
+            }
+        }
+
+        function showUploadFallback() {
+            // Create upload interface when camera is not available
+            const step2Content = document.querySelector('#step2 > div');
+            step2Content.innerHTML = `
+                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Captura de Imagem</h2>
+                <p class="text-sm text-slate-600 mb-4 text-center">A câmera não está disponível. Faça upload de uma foto ou tente novamente.</p>
+                
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                    <p class="text-xs text-yellow-800">
+                        <strong>Nota:</strong> Para usar a câmera ao vivo, acesse esta página via HTTPS ou localhost.
+                    </p>
+                </div>
+                
+                <label class="block w-full cursor-pointer mb-4">
+                    <input type="file" id="fallbackImageInput" accept="image/*" capture="user" class="hidden" onchange="handleFallbackUpload(event)">
+                    <div class="bg-blue-50 border-2 border-dashed border-blue-300 rounded-xl p-8 hover:bg-blue-100 transition-colors">
+                        <svg class="w-12 h-12 text-blue-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <span class="text-blue-700 font-semibold">Tocar para abrir câmera ou escolher da galeria</span>
+                    </div>
+                </label>
+                
+                <button onclick="retryCamera()" class="btn-primary mb-3">Tentar Câmera Novamente</button>
+                <button onclick="goToStep(1)" class="btn-secondary">Voltar</button>
+            `;
+            
+            goToStep(2);
+        }
+
+        function handleFallbackUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                image = new Image();
+                image.onload = function() {
+                    imgNaturalWidth = image.width;
+                    imgNaturalHeight = image.height;
+                    goToStep(3);
+                };
+                image.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function retryCamera() {
+            // Restore original step 2 content and try camera again
+            location.reload();
+        }
+
+        function stopCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            if (analysisInterval) {
+                clearInterval(analysisInterval);
+                analysisInterval = null;
+            }
+        }
+
+        function stopCameraAndGoBack() {
+            stopCamera();
+            goToStep(1);
+        }
+
+        function startDistanceAnalysis() {
+            const video = document.getElementById('videoElement');
+            const canvas = document.getElementById('analysisCanvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            
+            // Set canvas size to match video
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            
+            analysisInterval = setInterval(() => {
+                if (!videoStream || video.readyState < 2) return;
+                
+                // Draw current video frame to canvas for analysis
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Analyze the guide region to estimate distance
+                analyzeDistance(ctx, canvas.width, canvas.height);
+                
+            }, 200); // Analyze every 200ms
+        }
+
+        function analyzeDistance(ctx, width, height) {
+            // Define guide region (where the card should be)
+            const guideTop = height * 0.20;
+            const guideBottom = height * 0.32;
+            const guideLeft = width * 0.15;
+            const guideRight = width * 0.85;
+            const guideWidth = guideRight - guideLeft;
+            const guideHeight = guideBottom - guideTop;
+            
+            // Extract the guide region
+            const regionData = ctx.getImageData(guideLeft, guideTop, guideWidth, guideHeight);
+            
+            // Analyze edge density in the guide region
+            // A card will have strong horizontal and vertical edges
+            const edgeScore = calculateEdgeDensity(regionData, guideWidth, guideHeight);
+            
+            // Analyze color uniformity (cards are typically uniform colored rectangles)
+            const uniformityScore = calculateColorUniformity(regionData, guideWidth, guideHeight);
+            
+            // Combined score indicates how well the card is positioned
+            const fillScore = edgeScore * 0.6 + uniformityScore * 0.4;
+            
+            // Estimate distance based on face/card size in frame
+            // We use the overall brightness distribution as a proxy
+            const faceEstimate = estimateFaceSize(ctx, width, height);
+            
+            // Calculate estimated distance
+            // At 40cm, face typically occupies ~40% of frame width
+            // At 20cm, face occupies ~70% of frame width
+            // At 60cm, face occupies ~25% of frame width
+            const estimatedDistance = Math.round(40 * (0.4 / faceEstimate));
+            
+            // Update UI
+            updateLiveDistance(estimatedDistance, fillScore);
+        }
+
+        function calculateEdgeDensity(imageData, width, height) {
+            const data = imageData.data;
+            let edgeCount = 0;
+            const threshold = 30;
+            
+            // Sample every 4th pixel for performance
+            for (let y = 1; y < height - 1; y += 2) {
+                for (let x = 1; x < width - 1; x += 2) {
+                    const idx = (y * width + x) * 4;
+                    const idxRight = (y * width + x + 1) * 4;
+                    const idxDown = ((y + 1) * width + x) * 4;
+                    
+                    const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+                    const grayRight = (data[idxRight] + data[idxRight + 1] + data[idxRight + 2]) / 3;
+                    const grayDown = (data[idxDown] + data[idxDown + 1] + data[idxDown + 2]) / 3;
+                    
+                    if (Math.abs(gray - grayRight) > threshold || Math.abs(gray - grayDown) > threshold) {
+                        edgeCount++;
+                    }
+                }
+            }
+            
+            const totalPixels = (width / 2) * (height / 2);
+            const density = edgeCount / totalPixels;
+            
+            // Optimal edge density for a card is around 0.15-0.35
+            return Math.min(1, Math.max(0, (density - 0.05) / 0.3));
+        }
+
+        function calculateColorUniformity(imageData, width, height) {
+            const data = imageData.data;
+            let totalR = 0, totalG = 0, totalB = 0;
+            let count = 0;
+            
+            // Sample pixels
+            for (let i = 0; i < data.length; i += 16) {
+                totalR += data[i];
+                totalG += data[i + 1];
+                totalB += data[i + 2];
+                count++;
+            }
+            
+            const avgR = totalR / count;
+            const avgG = totalG / count;
+            const avgB = totalB / count;
+            
+            // Calculate variance
+            let variance = 0;
+            for (let i = 0; i < data.length; i += 16) {
+                const diffR = data[i] - avgR;
+                const diffG = data[i + 1] - avgG;
+                const diffB = data[i + 2] - avgB;
+                variance += (diffR * diffR + diffG * diffG + diffB * diffB) / 3;
+            }
+            variance /= count;
+            
+            // Lower variance = more uniform = higher score
+            // Typical card has variance < 500
+            return Math.min(1, Math.max(0, 1 - variance / 2000));
+        }
+
+        function estimateFaceSize(ctx, width, height) {
+            // Analyze the center region of the image where the face should be
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const regionSize = Math.min(width, height) * 0.4;
+            
+            const regionData = ctx.getImageData(
+                centerX - regionSize / 2,
+                centerY - regionSize / 2,
+                regionSize,
+                regionSize
+            );
+            
+            const data = regionData.data;
+            let skinPixels = 0;
+            let totalPixels = data.length / 4;
+            
+            // Count skin-tone pixels
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                
+                // Simple skin detection
+                if (r > 95 && g > 40 && b > 20 &&
+                    r > g && r > b &&
+                    Math.abs(r - g) > 15 &&
+                    r - b > 15) {
+                    skinPixels++;
+                }
+            }
+            
+            const skinRatio = skinPixels / totalPixels;
+            
+            // Map skin ratio to face size estimate
+            // Higher skin ratio = closer face = smaller distance
+            return Math.min(1, Math.max(0.1, skinRatio * 2));
+        }
+
+        function updateLiveDistance(distance, fillScore) {
+            const valueEl = document.getElementById('liveDistanceValue');
+            const statusEl = document.getElementById('liveDistanceStatus');
+            const barFill = document.getElementById('distanceBarFill');
+            const captureBtn = document.getElementById('captureBtn');
+            const guideOverlay = document.getElementById('guideOverlay');
+            
+            valueEl.textContent = `${distance} cm`;
+            
+            // Update bar position (map 20-80cm to 0-100%)
+            const barPosition = Math.min(100, Math.max(0, ((distance - 20) / 60) * 100));
+            barFill.style.width = `${barPosition}%`;
+            
+            if (distance >= 35 && distance <= 45) {
+                // Optimal distance
+                valueEl.className = 'distance-value optimal';
+                statusEl.textContent = '✓ Distância ideal! Pode capturar.';
+                statusEl.className = 'text-xs mt-2 text-center text-emerald-400 font-semibold';
+                barFill.style.background = '#10b981';
+                captureBtn.disabled = false;
+                guideOverlay.style.borderColor = 'rgba(16, 185, 129, 0.9)';
+            } else if (distance < 35) {
+                // Too close
+                valueEl.className = 'distance-value too-close';
+                statusEl.textContent = '✗ Muito perto! Afaste para 35-45 cm';
+                statusEl.className = 'text-xs mt-2 text-center text-red-400 font-semibold';
+                barFill.style.background = '#ef4444';
+                captureBtn.disabled = true;
+                guideOverlay.style.borderColor = 'rgba(239, 68, 68, 0.9)';
+            } else {
+                // Too far
+                valueEl.className = 'distance-value too-far';
+                statusEl.textContent = '✗ Muito longe! Aproxime para 35-45 cm';
+                statusEl.className = 'text-xs mt-2 text-center text-amber-400 font-semibold';
+                barFill.style.background = '#f59e0b';
+                captureBtn.disabled = true;
+                guideOverlay.style.borderColor = 'rgba(245, 158, 11, 0.9)';
+            }
+        }
+
+        function captureImage() {
+            const video = document.getElementById('videoElement');
+            const captureCanvas = document.createElement('canvas');
+            captureCanvas.width = video.videoWidth;
+            captureCanvas.height = video.videoHeight;
+            
+            const ctx = captureCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            // Convert to image
+            const dataURL = captureCanvas.toDataURL('image/jpeg', 0.9);
+            
+            image = new Image();
+            image.onload = function() {
+                imgNaturalWidth = image.width;
+                imgNaturalHeight = image.height;
+                stopCamera();
+                goToStep(3);
+            };
+            image.src = dataURL;
+        }
+
+        function goToStep(step) {
+            document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+            document.getElementById(`step${step}`).classList.add('active');
+            currentStep = step;
+
+            if (step === 3) {
+                setTimeout(initCalibrationCanvas, 100);
+            } else if (step === 4) {
+                setTimeout(initMeasurementCanvas, 100);
+            }
+        }
+
+        // Canvas Utilities
+        function setupCanvas(canvasId, points, pointClass, onPointUpdate) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+            
+            function resize() {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+                draw();
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            function getPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: (clientX - rect.left) * (canvas.width / rect.width),
+                    y: (clientY - rect.top) * (canvas.height / rect.height)
+                };
+            }
+
+            function findPoint(pos) {
+                const threshold = 30;
+                for (let i = 0; i < points.length; i++) {
+                    const px = points[i].x * canvas.width;
+                    const py = points[i].y * canvas.height;
+                    const dist = Math.sqrt((pos.x - px)**2 + (pos.y - py)**2);
+                    if (dist < threshold) return i;
+                }
+                return -1;
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                const scale = Math.min(canvas.width / imgNaturalWidth, canvas.height / imgNaturalHeight);
+                const w = imgNaturalWidth * scale;
+                const h = imgNaturalHeight * scale;
+                const offsetX = (canvas.width - w) / 2;
+                const offsetY = (canvas.height - h) / 2;
+                
+                ctx.drawImage(image, offsetX, offsetY, w, h);
+
+                canvas.dataset.scale = scale;
+                canvas.dataset.offsetX = offsetX;
+                canvas.dataset.offsetY = offsetY;
+
+                points.forEach((p, i) => {
+                    const px = p.x * canvas.width;
+                    const py = p.y * canvas.height;
+                    
+                    ctx.beginPath();
+                    ctx.arc(px, py, 14, 0, Math.PI * 2);
+                    ctx.fillStyle = pointClass === 'ref' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)';
+                    ctx.fill();
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeStyle = pointClass === 'ref' ? 'rgba(59, 130, 246, 0.9)' : 'rgba(16, 185, 129, 0.9)';
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(px - 22, py);
+                    ctx.lineTo(px + 22, py);
+                    ctx.moveTo(px, py - 22);
+                    ctx.lineTo(px, py + 22);
+                    ctx.strokeStyle = pointClass === 'ref' ? 'rgba(37, 99, 235, 0.8)' : 'rgba(5, 150, 105, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.arc(px, py, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = 'white';
+                    ctx.fill();
+                    ctx.strokeStyle = pointClass === 'ref' ? 'rgba(37, 99, 235, 0.9)' : 'rgba(5, 150, 105, 0.9)';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                });
+
+                if (points.length === 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x * canvas.width, points[0].y * canvas.height);
+                    ctx.lineTo(points[1].x * canvas.width, points[1].y * canvas.height);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+
+            function onStart(e) {
+                e.preventDefault();
+                const pos = getPos(e);
+                const idx = findPoint(pos);
+                if (idx !== -1) {
+                    if (pointClass === 'ref') activeRefPoint = idx;
+                    else activePupilPoint = idx;
+                }
+            }
+
+            function onMove(e) {
+                e.preventDefault();
+                let activeIdx = pointClass === 'ref' ? activeRefPoint : activePupilPoint;
+                if (activeIdx === -1) return;
+                
+                const pos = getPos(e);
+                const fingerOffset = 60;
+                const adjustedY = pos.y - fingerOffset;
+                
+                points[activeIdx].x = pos.x / canvas.width;
+                points[activeIdx].y = adjustedY / canvas.height;
+                
+                points[activeIdx].x = Math.max(0, Math.min(1, points[activeIdx].x));
+                points[activeIdx].y = Math.max(0, Math.min(1, points[activeIdx].y));
+                
+                draw();
+                onPointUpdate();
+            }
+
+            function onEnd() {
+                activeRefPoint = -1;
+                activePupilPoint = -1;
+            }
+
+            canvas.addEventListener('mousedown', onStart);
+            canvas.addEventListener('mousemove', onMove);
+            canvas.addEventListener('mouseup', onEnd);
+            canvas.addEventListener('mouseleave', onEnd);
+            
+            canvas.addEventListener('touchstart', onStart, {passive: false});
+            canvas.addEventListener('touchmove', onMove, {passive: false});
+            canvas.addEventListener('touchend', onEnd);
+
+            return draw;
+        }
+
+        function initCalibrationCanvas() {
+            setupCanvas('calibrationCanvas', refPoints, 'ref', () => {
+                const dist = Math.abs(refPoints[0].x - refPoints[1].x);
+                document.getElementById('btnToStep4').disabled = dist < 0.1;
+            });
+        }
+
+        function initMeasurementCanvas() {
+            setupCanvas('measurementCanvas', pupilPoints, 'pupil', () => {
+                const dist = Math.abs(pupilPoints[0].x - pupilPoints[1].x);
+                document.getElementById('btnToStep5').disabled = dist < 0.05;
+            });
+        }
+
+        function calculateAndShowResult() {
+            const canvas = document.getElementById('measurementCanvas');
+            const scale = parseFloat(canvas.dataset.scale);
+            
+            const refPx1 = { x: refPoints[0].x * canvas.width, y: refPoints[0].y * canvas.height };
+            const refPx2 = { x: refPoints[1].x * canvas.width, y: refPoints[1].y * canvas.height };
+            
+            const refImgDist = Math.sqrt(
+                ((refPx2.x - refPx1.x) / scale) ** 2 + 
+                ((refPx2.y - refPx1.y) / scale) ** 2
+            );
+
+            const pupilPx1 = { x: pupilPoints[0].x * canvas.width, y: pupilPoints[0].y * canvas.height };
+            const pupilPx2 = { x: pupilPoints[1].x * canvas.width, y: pupilPoints[1].y * canvas.height };
+
+            const pupilImgDist = Math.sqrt(
+                ((pupilPx2.x - pupilPx1.x) / scale) ** 2 + 
+                ((pupilPx2.y - pupilPx1.y) / scale) ** 2
+            );
+
+            const dp = (pupilImgDist / refImgDist) * STANDARD_CARD_WIDTH_MM;
+            const roundedDP = Math.round(dp * 2) / 2;
+            
+            document.getElementById('resultValue').textContent = roundedDP.toFixed(1);
+            
+            const name = document.getElementById('patientName').value.trim() || 'Não informado';
+            const dateRaw = document.getElementById('measurementDate').value;
+            const date = dateRaw ? new Date(dateRaw).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+            
+            document.getElementById('resultName').textContent = name;
+            document.getElementById('resultDate').textContent = date;
+            
+            goToStep(5);
+        }
+
+        function shareWhatsApp() {
+            const name = document.getElementById('patientName').value.trim() || 'Paciente';
+            const dateRaw = document.getElementById('measurementDate').value;
+            const date = dateRaw ? new Date(dateRaw).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+            const dp = document.getElementById('resultValue').textContent;
+            
+            const message = `*Medição de Distância Pupilar (DP)*\n\n👤 *Paciente:* ${name}\n📅 *Data:* ${date}\n📏 *DP:* ${dp} mm\n\n_Medido com Medidor Óptico_`;
+            const encodedMessage = encodeURIComponent(message);
+            window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+        }
+
+        function resetApp() {
+            stopCamera();
+            image = new Image();
+            refPoints = [{x: 0.3, y: 0.2}, {x: 0.7, y: 0.2}];
+            pupilPoints = [{x: 0.4, y: 0.5}, {x: 0.6, y: 0.5}];
+            document.getElementById('btnToStep4').disabled = true;
+            document.getElementById('btnToStep5').disabled = true;
+            document.getElementById('patientName').value = '';
+            document.getElementById('measurementDate').valueAsDate = new Date();
+            goToStep(1);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('measurementDate').valueAsDate = new Date();
+            
+            // Check if running on HTTP (not HTTPS or localhost)
+            const isSecure = window.location.protocol === 'https:' || 
+                           window.location.hostname === 'localhost' || 
+                           window.location.hostname === '127.0.0.1';
+            
+            if (!isSecure) {
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4';
+                warningDiv.innerHTML = `
+                    <p class="text-xs text-amber-800">
+                        <strong>⚠️ Modo de Compatibilidade:</strong> A câmera ao vivo requer HTTPS. 
+                        Você poderá fazer upload de fotos ou usar a câmera do sistema.
+                    </p>
+                `;
+                const step1Content = document.querySelector('#step1 > div');
+                step1Content.insertBefore(warningDiv, step1Content.lastElementChild);
+            }
+        });
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
