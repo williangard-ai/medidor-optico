@@ -339,7 +339,9 @@
         <div id="step3" class="step">
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Passo 1: Calibração</h2>
-                <p class="text-sm text-slate-600 mb-2 text-center">Arraste os pontos <span class="text-blue-600 font-bold">azuis</span> para as extremidades do cartão de referência.</p>
+                <div id="calibrationStatus" class="mb-2">
+                    <p class="text-sm text-slate-600 text-center">Arraste os pontos <span class="text-blue-600 font-bold">azuis</span> para as extremidades do cartão de referência.</p>
+                </div>
                 <p class="text-xs text-blue-600 bg-blue-50 py-1 px-3 rounded-full inline-block mx-auto mb-4 border border-blue-100">💡 Dica: O marcador aparecerá logo acima do seu dedo.</p>
                 
                 <div class="relative w-full overflow-hidden rounded-lg bg-slate-100" style="aspect-ratio: 4/3;">
@@ -350,6 +352,10 @@
                     <button onclick="goToStep(2)" class="btn-secondary flex-1">Recapturar</button>
                     <button id="btnToStep4" onclick="goToStep(4)" class="btn-primary flex-1" disabled>Próximo</button>
                 </div>
+                
+                <button onclick="retryAutoDetection()" class="btn-secondary mt-3 text-sm">
+                    🔍 Tentar Detectar Cartão Novamente
+                </button>
             </div>
         </div>
 
@@ -879,9 +885,358 @@
                 imgNaturalWidth = image.width;
                 imgNaturalHeight = image.height;
                 stopCamera();
+                
+                // Try to auto-detect card borders
+                const cardDetected = autoDetectCardBorders(captureCanvas);
+                
+                // Update calibration status message
+                const statusDiv = document.getElementById('calibrationStatus');
+                if (cardDetected) {
+                    statusDiv.innerHTML = `
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-2">
+                            <p class="text-sm text-emerald-800 text-center font-semibold">
+                                ✓ Cartão detectado automaticamente!
+                            </p>
+                            <p class="text-xs text-emerald-700 text-center mt-1">
+                                Ajuste os pontos se necessário ou avance para o próximo passo.
+                            </p>
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
+                            <p class="text-sm text-amber-800 text-center font-semibold">
+                                ⚠️ Cartão não detectado automaticamente
+                            </p>
+                            <p class="text-xs text-amber-700 text-center mt-1">
+                                Arraste os pontos azuis manualmente para as bordas do cartão.
+                            </p>
+                        </div>
+                    `;
+                    // Reset to default positions for manual calibration
+                    refPoints = [{x: 0.3, y: 0.2}, {x: 0.7, y: 0.2}];
+                }
+                
                 goToStep(3);
             };
             image.src = dataURL;
+        }
+
+        function autoDetectCardBorders(canvas) {
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Get image data
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            
+            // Step 1: Convert to grayscale
+            const gray = new Uint8Array(width * height);
+            for (let i = 0; i < width * height; i++) {
+                const idx = i * 4;
+                gray[i] = (data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114) | 0;
+            }
+            
+            // Step 2: Apply Gaussian blur (simplified 3x3 kernel)
+            const blurred = new Uint8Array(width * height);
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const sum = 
+                        gray[(y-1) * width + (x-1)] + gray[(y-1) * width + x] * 2 + gray[(y-1) * width + (x+1)] +
+                        gray[y * width + (x-1)] * 2 + gray[y * width + x] * 4 + gray[y * width + (x+1)] * 2 +
+                        gray[(y+1) * width + (x-1)] + gray[(y+1) * width + x] * 2 + gray[(y+1) * width + (x+1)];
+                    blurred[y * width + x] = sum / 16;
+                }
+            }
+            
+            // Step 3: Edge detection (Sobel operator)
+            const edges = new Uint8Array(width * height);
+            const threshold = 50;
+            
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    // Sobel X
+                    const gx = 
+                        -blurred[(y-1) * width + (x-1)] + blurred[(y-1) * width + (x+1)] +
+                        -2 * blurred[y * width + (x-1)] + 2 * blurred[y * width + (x+1)] +
+                        -blurred[(y+1) * width + (x-1)] + blurred[(y+1) * width + (x+1)];
+                    
+                    // Sobel Y
+                    const gy = 
+                        -blurred[(y-1) * width + (x-1)] - 2 * blurred[(y-1) * width + x] - blurred[(y-1) * width + (x+1)] +
+                        blurred[(y+1) * width + (x-1)] + 2 * blurred[(y+1) * width + x] + blurred[(y+1) * width + (x+1)];
+                    
+                    const magnitude = Math.sqrt(gx * gx + gy * gy);
+                    edges[y * width + x] = magnitude > threshold ? 255 : 0;
+                }
+            }
+            
+            // Step 4: Find rectangular contours with card-like aspect ratio
+            const cardAspectRatio = 1.586; // 85.6 / 53.98
+            const tolerance = 0.3; // 30% tolerance
+            
+            // Focus on upper portion of image (where card typically is on forehead)
+            const searchTop = 0;
+            const searchBottom = Math.floor(height * 0.5);
+            const searchLeft = Math.floor(width * 0.1);
+            const searchRight = Math.floor(width * 0.9);
+            
+            // Find horizontal and vertical edge lines
+            const horizontalLines = findHorizontalLines(edges, width, height, searchTop, searchBottom, searchLeft, searchRight);
+            const verticalLines = findVerticalLines(edges, width, height, searchTop, searchBottom, searchLeft, searchRight);
+            
+            // Try to find rectangles formed by intersecting lines
+            let bestRect = null;
+            let bestScore = 0;
+            
+            for (const h1 of horizontalLines) {
+                for (const h2 of horizontalLines) {
+                    if (Math.abs(h1.y - h2.y) < 20) continue; // Skip if too close
+                    
+                    const rectHeight = Math.abs(h1.y - h2.y);
+                    
+                    for (const v1 of verticalLines) {
+                        for (const v2 of verticalLines) {
+                            if (Math.abs(v1.x - v2.x) < 20) continue; // Skip if too close
+                            
+                            const rectWidth = Math.abs(v1.x - v2.x);
+                            const aspectRatio = rectWidth / rectHeight;
+                            
+                            // Check if aspect ratio matches card
+                            if (Math.abs(aspectRatio - cardAspectRatio) / cardAspectRatio < tolerance) {
+                                // Calculate score based on edge strength and aspect ratio match
+                                const aspectScore = 1 - Math.abs(aspectRatio - cardAspectRatio) / cardAspectRatio;
+                                const edgeScore = (h1.strength + h2.strength + v1.strength + v2.strength) / 4;
+                                const score = aspectScore * 0.6 + edgeScore * 0.4;
+                                
+                                if (score > bestScore) {
+                                    bestScore = score;
+                                    bestRect = {
+                                        x1: Math.min(v1.x, v2.x),
+                                        y1: Math.min(h1.y, h2.y),
+                                        x2: Math.max(v1.x, v2.x),
+                                        y2: Math.max(h1.y, h2.y),
+                                        score: score
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // If no rectangle found, try alternative method: find largest rectangular region
+            if (!bestRect || bestScore < 0.3) {
+                bestRect = findLargestCardRegion(edges, width, height, cardAspectRatio, tolerance);
+            }
+            
+            if (bestRect && bestRect.score > 0.25) {
+                // Convert pixel coordinates to normalized coordinates (0-1)
+                // Card left and right edges
+                refPoints[0] = {
+                    x: bestRect.x1 / width,
+                    y: (bestRect.y1 + bestRect.y2) / 2 / height
+                };
+                refPoints[1] = {
+                    x: bestRect.x2 / width,
+                    y: (bestRect.y1 + bestRect.y2) / 2 / height
+                };
+                
+                // Enable next button
+                setTimeout(() => {
+                    const btn = document.getElementById('btnToStep4');
+                    if (btn) btn.disabled = false;
+                }, 100);
+                
+                return true;
+            }
+            
+            return false;
+        }
+
+        function findHorizontalLines(edges, width, height, top, bottom, left, right) {
+            const lines = [];
+            const minLineLength = (right - left) * 0.3; // At least 30% of search width
+            
+            for (let y = top; y < bottom; y += 2) {
+                let lineStart = -1;
+                let lineLength = 0;
+                let edgeCount = 0;
+                
+                for (let x = left; x < right; x += 2) {
+                    if (edges[y * width + x] > 0) {
+                        if (lineStart === -1) lineStart = x;
+                        lineLength++;
+                        edgeCount++;
+                    } else {
+                        if (lineLength > minLineLength && edgeCount > lineLength * 0.5) {
+                            lines.push({
+                                y: y,
+                                x1: lineStart,
+                                x2: lineStart + lineLength * 2,
+                                strength: edgeCount / lineLength
+                            });
+                        }
+                        lineStart = -1;
+                        lineLength = 0;
+                        edgeCount = 0;
+                    }
+                }
+                
+                if (lineLength > minLineLength && edgeCount > lineLength * 0.5) {
+                    lines.push({
+                        y: y,
+                        x1: lineStart,
+                        x2: lineStart + lineLength * 2,
+                        strength: edgeCount / lineLength
+                    });
+                }
+            }
+            
+            // Merge close lines
+            return mergeCloseLines(lines, 'y', 10);
+        }
+
+        function findVerticalLines(edges, width, height, top, bottom, left, right) {
+            const lines = [];
+            const minLineLength = (bottom - top) * 0.3; // At least 30% of search height
+            
+            for (let x = left; x < right; x += 2) {
+                let lineStart = -1;
+                let lineLength = 0;
+                let edgeCount = 0;
+                
+                for (let y = top; y < bottom; y += 2) {
+                    if (edges[y * width + x] > 0) {
+                        if (lineStart === -1) lineStart = y;
+                        lineLength++;
+                        edgeCount++;
+                    } else {
+                        if (lineLength > minLineLength && edgeCount > lineLength * 0.5) {
+                            lines.push({
+                                x: x,
+                                y1: lineStart,
+                                y2: lineStart + lineLength * 2,
+                                strength: edgeCount / lineLength
+                            });
+                        }
+                        lineStart = -1;
+                        lineLength = 0;
+                        edgeCount = 0;
+                    }
+                }
+                
+                if (lineLength > minLineLength && edgeCount > lineLength * 0.5) {
+                    lines.push({
+                        x: x,
+                        y1: lineStart,
+                        y2: lineStart + lineLength * 2,
+                        strength: edgeCount / lineLength
+                    });
+                }
+            }
+            
+            // Merge close lines
+            return mergeCloseLines(lines, 'x', 10);
+        }
+
+        function mergeCloseLines(lines, coord, threshold) {
+            if (lines.length === 0) return [];
+            
+            const merged = [];
+            const used = new Set();
+            
+            for (let i = 0; i < lines.length; i++) {
+                if (used.has(i)) continue;
+                
+                let sum = lines[i][coord];
+                let count = 1;
+                let maxStrength = lines[i].strength;
+                used.add(i);
+                
+                for (let j = i + 1; j < lines.length; j++) {
+                    if (used.has(j)) continue;
+                    if (Math.abs(lines[j][coord] - lines[i][coord]) < threshold) {
+                        sum += lines[j][coord];
+                        count++;
+                        maxStrength = Math.max(maxStrength, lines[j].strength);
+                        used.add(j);
+                    }
+                }
+                
+                const mergedLine = { ...lines[i] };
+                mergedLine[coord] = sum / count;
+                mergedLine.strength = maxStrength;
+                merged.push(mergedLine);
+            }
+            
+            // Sort by strength and return top candidates
+            return merged.sort((a, b) => b.strength - a.strength).slice(0, 10);
+        }
+
+        function findLargestCardRegion(edges, width, height, cardAspectRatio, tolerance) {
+            // Alternative method: scan for rectangular regions with high edge density
+            const step = 8; // Sample every 8 pixels
+            let bestRect = null;
+            let bestScore = 0;
+            
+            // Search in upper portion
+            for (let y1 = 0; y1 < height * 0.4; y1 += step) {
+                for (let y2 = y1 + 30; y2 < height * 0.6; y2 += step) {
+                    const rectHeight = y2 - y1;
+                    const expectedWidth = rectHeight * cardAspectRatio;
+                    
+                    for (let x1 = 0; x1 < width - expectedWidth; x1 += step) {
+                        const x2 = x1 + expectedWidth;
+                        
+                        if (x2 >= width) continue;
+                        
+                        // Calculate edge density along the borders
+                        let topEdge = 0, bottomEdge = 0, leftEdge = 0, rightEdge = 0;
+                        let totalSamples = 0;
+                        
+                        // Top edge
+                        for (let x = x1; x < x2; x += 4) {
+                            if (edges[y1 * width + x] > 0) topEdge++;
+                            totalSamples++;
+                        }
+                        
+                        // Bottom edge
+                        for (let x = x1; x < x2; x += 4) {
+                            if (edges[y2 * width + x] > 0) bottomEdge++;
+                            totalSamples++;
+                        }
+                        
+                        // Left edge
+                        for (let y = y1; y < y2; y += 4) {
+                            if (edges[y * width + x1] > 0) leftEdge++;
+                            totalSamples++;
+                        }
+                        
+                        // Right edge
+                        for (let y = y1; y < y2; y += 4) {
+                            if (edges[y * width + x2] > 0) rightEdge++;
+                            totalSamples++;
+                        }
+                        
+                        const edgeDensity = (topEdge + bottomEdge + leftEdge + rightEdge) / totalSamples;
+                        
+                        if (edgeDensity > bestScore && edgeDensity > 0.15) {
+                            bestScore = edgeDensity;
+                            bestRect = {
+                                x1: x1,
+                                y1: y1,
+                                x2: x2,
+                                y2: y2,
+                                score: edgeDensity
+                            };
+                        }
+                    }
+                }
+            }
+            
+            return bestRect;
         }
 
         function goToStep(step) {
@@ -1039,6 +1394,48 @@
                 const dist = Math.abs(refPoints[0].x - refPoints[1].x);
                 document.getElementById('btnToStep4').disabled = dist < 0.1;
             });
+        }
+
+        function retryAutoDetection() {
+            // Create a temporary canvas with the current image
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = imgNaturalWidth;
+            tempCanvas.height = imgNaturalHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(image, 0, 0);
+            
+            // Try auto-detection again
+            const cardDetected = autoDetectCardBorders(tempCanvas);
+            
+            // Update status message
+            const statusDiv = document.getElementById('calibrationStatus');
+            if (cardDetected) {
+                statusDiv.innerHTML = `
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-2">
+                        <p class="text-sm text-emerald-800 text-center font-semibold">
+                            ✓ Cartão detectado automaticamente!
+                        </p>
+                        <p class="text-xs text-emerald-700 text-center mt-1">
+                            Ajuste os pontos se necessário ou avance para o próximo passo.
+                        </p>
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
+                        <p class="text-sm text-red-800 text-center font-semibold">
+                            ✗ Não foi possível detectar o cartão
+                        </p>
+                        <p class="text-xs text-red-700 text-center mt-1">
+                            Certifique-se de que o cartão está visível e com boa iluminação.
+                            Use os pontos azuis manualmente.
+                        </p>
+                    </div>
+                `;
+            }
+            
+            // Reinitialize canvas with new points
+            initCalibrationCanvas();
         }
 
         function initMeasurementCanvas() {
