@@ -3,233 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Medidor Óptico By Willian L. - Distância Pupilar</title>
+    <title>Medidor Óptico By Willian L.</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            touch-action: manipulation;
-        }
-        .step {
-            display: none;
-        }
-        .step.active {
-            display: block;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .btn-primary {
-            background-color: #2563eb;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            width: 100%;
-            text-align: center;
-            transition: background-color 0.2s;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; touch-action: manipulation; }
+        .step { display: none; }
+        .step.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .btn-primary { background-color: #2563eb; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; width: 100%; text-align: center; transition: background-color 0.2s; border: none; cursor: pointer; }
         .btn-primary:hover { background-color: #1d4ed8; }
         .btn-primary:disabled { background-color: #93c5fd; cursor: not-allowed; }
-        .btn-secondary {
-            background-color: #f3f4f6;
-            color: #374151;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            width: 100%;
-            text-align: center;
-            margin-top: 0.5rem;
-        }
-        #videoContainer {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 3/4;
-            background: #000;
-            border-radius: 0.75rem;
-            overflow: hidden;
-        }
-        #videoElement {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.3s ease;
-        }
-        #videoElement.mirror {
-            transform: scaleX(-1);
-        }
-        .guide-overlay {
-            position: absolute;
-            top: 18%;
-            left: 50%;
-            transform: translateX(-50%);
-            /* Credit card ratio: 85.6mm x 53.98mm = 1.586:1 */
-            width: 55%;
-            aspect-ratio: 1.586 / 1;
-            border: 3px solid rgba(255, 255, 255, 0.9);
-            border-radius: 10px;
-            pointer-events: none;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
-            transition: border-color 0.3s, box-shadow 0.3s;
-        }
-        .guide-overlay.optimal {
-            border-color: #10b981;
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5), 0 0 0 9999px rgba(0, 0, 0, 0.3);
-        }
-        .guide-overlay.too-close {
-            border-color: #ef4444;
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5), 0 0 0 9999px rgba(0, 0, 0, 0.3);
-        }
-        .guide-overlay.too-far {
-            border-color: #f59e0b;
-            box-shadow: 0 0 20px rgba(245, 158, 11, 0.5), 0 0 0 9999px rgba(0, 0, 0, 0.3);
-        }
-        .guide-label {
-            position: absolute;
-            top: -30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 4px 14px;
-            border-radius: 12px;
-            font-size: 11px;
-            white-space: nowrap;
-            font-weight: 600;
-        }
-        .guide-card-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            opacity: 0.4;
-            pointer-events: none;
-        }
-        .guide-corner {
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            border-color: rgba(255, 255, 255, 0.9);
-            border-style: solid;
-        }
-        .guide-corner.tl { top: -1px; left: -1px; border-width: 3px 0 0 3px; border-radius: 6px 0 0 0; }
-        .guide-corner.tr { top: -1px; right: -1px; border-width: 3px 3px 0 0; border-radius: 0 6px 0 0; }
-        .guide-corner.bl { bottom: -1px; left: -1px; border-width: 0 0 3px 3px; border-radius: 0 0 0 6px; }
-        .guide-corner.br { bottom: -1px; right: -1px; border-width: 0 3px 3px 0; border-radius: 0 0 6px 0; }
-        
-        .camera-toggle {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            width: 44px;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            z-index: 10;
-        }
-        .camera-toggle:hover {
-            background: rgba(0, 0, 0, 0.9);
-            border-color: rgba(255, 255, 255, 0.6);
-        }
-        .camera-toggle:active {
-            transform: scale(0.9);
-        }
-        .camera-toggle svg {
-            width: 22px;
-            height: 22px;
-            color: white;
-        }
-        .camera-label {
-            position: absolute;
-            top: 15px;
-            right: 70px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 16px;
-            font-size: 11px;
-            font-weight: 600;
-            white-space: nowrap;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-        .camera-label.show {
-            opacity: 1;
-        }
-        .capture-btn {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background: white;
-            border: 4px solid rgba(255, 255, 255, 0.5);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .capture-btn:active {
-            transform: translateX(-50%) scale(0.9);
-        }
-        .capture-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .distance-panel {
-            position: absolute;
-            bottom: 100px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 12px 16px;
-            color: white;
-        }
-        .distance-value {
-            font-size: 28px;
-            font-weight: 700;
-            transition: color 0.3s;
-        }
-        .distance-value.optimal { color: #10b981; }
-        .distance-value.too-close { color: #ef4444; }
-        .distance-value.too-far { color: #f59e0b; }
-        .distance-bar {
-            height: 6px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
-            margin-top: 8px;
-            overflow: hidden;
-            position: relative;
-        }
-        .distance-bar-fill {
-            height: 100%;
-            border-radius: 3px;
-            transition: all 0.3s;
-        }
-        .distance-bar-optimal {
-            position: absolute;
-            height: 100%;
-            background: rgba(16, 185, 129, 0.3);
-            border-radius: 3px;
-        }
+        .btn-secondary { background-color: #f3f4f6; color: #374151; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; width: 100%; text-align: center; margin-top: 0.5rem; border: none; cursor: pointer; }
+        #videoContainer { position: relative; width: 100%; aspect-ratio: 3/4; background: #000; border-radius: 0.75rem; overflow: hidden; }
+        #videoElement { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; }
+        #videoElement.mirror { transform: scaleX(-1); }
+        #overlayCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .camera-toggle { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; }
+        .camera-toggle svg { width: 22px; height: 22px; color: white; }
+        .status-panel { position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); border-radius: 12px; padding: 12px 16px; color: white; }
+        .confidence-bar { height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+        .confidence-fill { height: 100%; border-radius: 4px; transition: all 0.3s; }
+        .capture-btn { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); width: 70px; height: 70px; border-radius: 50%; background: white; border: 4px solid rgba(255,255,255,0.5); box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer; }
+        .capture-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .capture-btn:active:not(:disabled) { transform: translateX(-50%) scale(0.9); }
+        .measure-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+        .measure-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .measure-value { font-size: 24px; font-weight: 700; color: #1e293b; }
+        .measure-unit { font-size: 14px; color: #94a3b8; margin-left: 2px; }
+        #frameCanvas { touch-action: none; cursor: crosshair; max-width: 100%; border-radius: 0.5rem; }
+        .frame-point { position: absolute; width: 20px; height: 20px; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        .frame-point.top { background: rgba(239, 68, 68, 0.8); border: 2px solid white; }
+        .frame-point.bottom { background: rgba(34, 197, 94, 0.8); border: 2px solid white; }
+        .frame-point.pupil { background: rgba(59, 130, 246, 0.8); border: 2px solid white; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
-
-    <!-- Header -->
     <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10">
         <div class="max-w-md mx-auto flex items-center justify-center">
             <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
@@ -237,32 +45,28 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-grow p-4 max-w-md mx-auto w-full">
-        
         <!-- Step 1: Welcome -->
         <div id="step1" class="step active">
             <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-2xl font-bold text-slate-900 mb-4">Medição de Distância Pupilar (DP)</h2>
-                <p class="text-slate-600 mb-6">Obtenha sua medida de DP com precisão profissional usando seu smartphone e um cartão de referência.</p>
-                
+                <h2 class="text-2xl font-bold text-slate-900 mb-4">Medição de Distância Pupilar</h2>
+                <p class="text-slate-600 mb-6">Sistema profissional com detecção facial automática via IA.</p>
                 <div class="space-y-4 mb-6">
                     <div class="flex items-start">
                         <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">1</div>
-                        <p class="text-sm text-slate-700">Posicione um cartão de crédito na testa, acima das sobrancelhas.</p>
+                        <p class="text-sm text-slate-700">Preencha os dados do paciente e inicie a medição.</p>
                     </div>
                     <div class="flex items-start">
                         <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">2</div>
-                        <p class="text-sm text-slate-700">A câmera abrirá automaticamente. Alinhe o cartão no guia e mantenha a distância indicada.</p>
+                        <p class="text-sm text-slate-700">Posicione o rosto na câmera. O sistema detecta automaticamente olhos, nariz e contorno facial.</p>
                     </div>
                     <div class="flex items-start">
                         <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">3</div>
-                        <p class="text-sm text-slate-700">Quando a distância estiver correta (verde), toque no botão de captura.</p>
+                        <p class="text-sm text-slate-700">Capture quando a confiança estiver alta. Opcionalmente use um marcador ArUco para calibração de escala.</p>
                     </div>
                 </div>
-
                 <div class="border-t border-slate-200 pt-6 mb-6">
-                    <h3 class="text-sm font-semibold text-slate-900 mb-3">Dados da Medição</h3>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-3">Dados do Paciente</h3>
                     <div class="space-y-3">
                         <div>
                             <label class="block text-xs font-medium text-slate-600 mb-1">Nome do Paciente</label>
@@ -274,1539 +78,1537 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                        </svg>
-                        <div>
-                            <p class="text-xs font-semibold text-blue-900">Dispositivo Detectado</p>
-                            <p class="text-xs text-blue-700" id="deviceInfoDisplay">Detectando...</p>
-                        </div>
-                    </div>
-                </div>
-
                 <button onclick="startCamera()" class="btn-primary">Iniciar Medição</button>
             </div>
         </div>
 
-        <!-- Step 2: Live Camera -->
+        <!-- Step 2: Camera with Face Detection -->
         <div id="step2" class="step">
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Posicione para Captura</h2>
-                <p class="text-xs text-slate-600 mb-3 text-center">Alinhe o cartão de crédito no guia. A distância ideal é <strong>35-45 cm</strong>.</p>
-                
+                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Detecção Facial</h2>
+                <p class="text-xs text-slate-600 mb-3 text-center">Posicione o rosto centralizado. Aguarde a detecção automática.</p>
                 <div id="videoContainer">
                     <video id="videoElement" autoplay playsinline></video>
-                    <canvas id="analysisCanvas" style="display:none;"></canvas>
-                    
-                    <!-- Camera toggle button -->
-                    <button class="camera-toggle" id="cameraToggle" onclick="toggleCamera()" title="Alternar câmera">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
+                    <canvas id="overlayCanvas"></canvas>
+                    <button class="camera-toggle" onclick="toggleCamera()">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </button>
-                    <div class="camera-label" id="cameraLabel">Frontal</div>
-                    
-                    <!-- Guide overlay - Credit card format -->
-                    <div class="guide-overlay" id="guideOverlay">
-                        <div class="guide-label">💳 Alinhe o cartão aqui</div>
-                        <div class="guide-corner tl"></div>
-                        <div class="guide-corner tr"></div>
-                        <div class="guide-corner bl"></div>
-                        <div class="guide-corner br"></div>
-                        <svg class="guide-card-icon" width="40" height="25" viewBox="0 0 40 25" fill="none" stroke="white" stroke-width="1.5">
-                            <rect x="1" y="1" width="38" height="23" rx="3"/>
-                            <line x1="1" y1="7" x2="39" y2="7"/>
-                            <rect x="5" y="12" width="8" height="6" rx="1"/>
-                        </svg>
-                    </div>
-                    
-                    <!-- Distance panel -->
-                    <div class="distance-panel">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
-                                <span class="text-sm font-medium">Distância:</span>
-                            </div>
-                            <div class="distance-value" id="liveDistanceValue">-- cm</div>
+                    <div class="status-panel">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium">Status:</span>
+                            <span id="faceStatus" class="text-sm font-bold text-amber-400">Aguardando...</span>
                         </div>
-                        <div class="distance-bar">
-                            <div class="distance-bar-optimal" style="left: 35%; width: 25%;"></div>
-                            <div class="distance-bar-fill" id="distanceBarFill" style="width: 0%; background: #ef4444;"></div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-slate-300">Confiança:</span>
+                            <span id="confidenceValue" class="text-xs font-bold">0%</span>
                         </div>
-                        <p class="text-xs mt-2 text-center" id="liveDistanceStatus">Aguardando análise...</p>
+                        <div class="confidence-bar">
+                            <div id="confidenceFill" class="confidence-fill" style="width: 0%; background: #ef4444;"></div>
+                        </div>
+                        <div id="landmarkInfo" class="text-xs text-slate-400 mt-2 text-center">Inicializando detecção facial...</div>
                     </div>
-                    
-                    <!-- Capture button -->
-                    <button class="capture-btn" id="captureBtn" onclick="captureImage()" disabled>
-                        <div class="w-full h-full rounded-full border-4 border-blue-500"></div>
-                    </button>
+                    <button class="capture-btn" id="captureBtn" onclick="captureMeasurement()" disabled></button>
                 </div>
-
                 <div class="flex gap-3 mt-4">
                     <button onclick="stopCameraAndGoBack()" class="btn-secondary flex-1">Cancelar</button>
+                    <button onclick="toggleCalibrationMode()" class="btn-primary flex-1 text-sm" id="calibrationToggle">🎯 Calibrar com Marcador</button>
                 </div>
             </div>
         </div>
 
-        <!-- Step 3: Calibration -->
+        <!-- Step 3: ArUco Calibration (Optional) -->
         <div id="step3" class="step">
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Passo 1: Calibração</h2>
-                <div id="calibrationStatus" class="mb-2">
-                    <p class="text-sm text-slate-600 text-center">Arraste os pontos <span class="text-blue-600 font-bold">azuis</span> para as extremidades do cartão de referência.</p>
+                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Calibração com Marcador</h2>
+                <p class="text-sm text-slate-600 mb-4 text-center">Posicione um marcador ArUco ou QR Code de tamanho conhecido na testa do paciente para calibração de escala precisa.</p>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p class="text-xs text-blue-800 mb-2"><strong>Tamanho do marcador (largura):</strong></p>
+                    <input type="number" id="markerWidth" value="30" min="10" max="100" step="0.5" class="w-full p-2 bg-white border border-blue-300 rounded text-sm">
+                    <p class="text-xs text-blue-600 mt-1">mm (padrão: 30mm)</p>
                 </div>
-                <p class="text-xs text-blue-600 bg-blue-50 py-1 px-3 rounded-full inline-block mx-auto mb-4 border border-blue-100">💡 Dica: O marcador aparecerá logo acima do seu dedo.</p>
-                
-                <div class="relative w-full overflow-hidden rounded-lg bg-slate-100" style="aspect-ratio: 4/3;">
+                <div class="relative w-full overflow-hidden rounded-lg bg-slate-100 mb-4" style="aspect-ratio: 4/3;">
                     <canvas id="calibrationCanvas" class="w-full h-full block"></canvas>
                 </div>
-
-                <div class="flex gap-3 mt-4">
-                    <button onclick="goToStep(2)" class="btn-secondary flex-1">Recapturar</button>
-                    <button id="btnToStep4" onclick="goToStep(4)" class="btn-primary flex-1" disabled>Próximo</button>
+                <p class="text-xs text-slate-500 text-center mb-4">Arraste os pontos para as extremidades do marcador.</p>
+                <div class="flex gap-3">
+                    <button onclick="goToStep(2)" class="btn-secondary flex-1">Voltar</button>
+                    <button id="btnCalibrationDone" onclick="finishCalibration()" class="btn-primary flex-1" disabled>Confirmar</button>
                 </div>
-                
-                <button onclick="retryAutoDetection()" class="btn-secondary mt-3 text-sm">
-                    🔍 Tentar Detectar Cartão Novamente
-                </button>
             </div>
         </div>
 
-        <!-- Step 4: Measurement -->
+        <!-- Step 4: Validation Screen -->
         <div id="step4" class="step">
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Passo 2: Medição</h2>
-                <p class="text-sm text-slate-600 mb-2 text-center">Arraste os pontos <span class="text-emerald-600 font-bold">verdes</span> para o centro exato de cada pupila.</p>
-                <p class="text-xs text-emerald-700 bg-emerald-50 py-1 px-3 rounded-full inline-block mx-auto mb-4 border border-emerald-100">💡 Dica: O marcador aparecerá logo acima do seu dedo.</p>
+                <h2 class="text-lg font-bold text-slate-900 mb-4 text-center">Validação da Medição</h2>
                 
-                <div class="relative w-full overflow-hidden rounded-lg bg-slate-100" style="aspect-ratio: 4/3;">
-                    <canvas id="measurementCanvas" class="w-full h-full block"></canvas>
+                <div class="measure-card">
+                    <div class="measure-label">DP Total (Distância Pupilar)</div>
+                    <div><span id="dpTotal" class="measure-value">--</span><span class="measure-unit">mm</span></div>
                 </div>
 
-                <div class="flex gap-3 mt-4">
-                    <button onclick="goToStep(3)" class="btn-secondary flex-1">Voltar</button>
-                    <button id="btnToStep5" onclick="calculateAndShowResult()" class="btn-primary flex-1" disabled>Calcular DP</button>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div class="measure-card">
+                        <div class="measure-label">DP Monocular OD</div>
+                        <div><span id="dpOD" class="measure-value text-blue-600">--</span><span class="measure-unit">mm</span></div>
+                    </div>
+                    <div class="measure-card">
+                        <div class="measure-label">DP Monocular OE</div>
+                        <div><span id="dpOE" class="measure-value text-blue-600">--</span><span class="measure-unit">mm</span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div class="measure-card">
+                        <div class="measure-label">Altura Pupilar OD</div>
+                        <div><span id="heightOD" class="measure-value text-emerald-600">--</span><span class="measure-unit">mm</span></div>
+                    </div>
+                    <div class="measure-card">
+                        <div class="measure-label">Altura Pupilar OE</div>
+                        <div><span id="heightOE" class="measure-value text-emerald-600">--</span><span class="measure-unit">mm</span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div class="measure-card">
+                        <div class="measure-label">Inclinação da Cabeça</div>
+                        <div><span id="headTilt" class="measure-value text-purple-600">--</span><span class="measure-unit">°</span></div>
+                    </div>
+                    <div class="measure-card">
+                        <div class="measure-label">Confiança</div>
+                        <div><span id="confidenceLevel" class="measure-value">--</span><span class="measure-unit">%</span></div>
+                    </div>
+                </div>
+
+                <div id="validationAlert" class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4">
+                    <p class="text-sm text-emerald-800 font-semibold text-center">✓ Medição válida</p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="goToStep(2)" class="btn-secondary flex-1">Recapturar</button>
+                    <button onclick="showResults()" class="btn-primary flex-1">Confirmar</button>
+                </div>
+                
+                <div class="mt-4 pt-4 border-t border-slate-200">
+                    <button onclick="goToStep(5)" class="btn-secondary w-full">
+                        📐 Medir Altura Pupilar com Armação
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Step 5: Result -->
+        <!-- Step 5: Frame Measurement (Altura Pupilar com Armação) -->
         <div id="step5" class="step">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Altura Pupilar com Armação</h2>
+                <p class="text-xs text-slate-600 mb-4 text-center">
+                    Digite o comprimento do aro e o sistema calculará automaticamente a altura pupilar.
+                </p>
+
+                <!-- Input do comprimento do aro -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p class="text-sm font-semibold text-blue-900 mb-3">Comprimento do Aro da Armação</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-blue-700 mb-1">Aro OD (Direito)</label>
+                            <input type="number" id="frameWidthOD" value="52" min="30" max="70" step="0.5" 
+                                   class="w-full p-2 bg-white border border-blue-300 rounded text-sm text-center font-bold">
+                            <p class="text-xs text-blue-600 mt-1 text-center">mm</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-blue-700 mb-1">Aro OE (Esquerdo)</label>
+                            <input type="number" id="frameWidthOE" value="52" min="30" max="70" step="0.5" 
+                                   class="w-full p-2 bg-white border border-blue-300 rounded text-sm text-center font-bold">
+                            <p class="text-xs text-blue-600 mt-1 text-center">mm</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-blue-700 mt-3 text-center">
+                        💡 Meça a largura horizontal interna de cada aro
+                    </p>
+                </div>
+                
+                <div id="frameVideoContainer" style="position: relative; width: 100%; aspect-ratio: 3/4; background: #000; border-radius: 0.75rem; overflow: hidden;">
+                    <video id="frameVideoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    <canvas id="frameOverlayCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
+                    
+                    <div class="status-panel">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium">Status:</span>
+                            <span id="frameStatus" class="text-sm font-bold text-amber-400">Aguardando...</span>
+                        </div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-slate-300">Confiança:</span>
+                            <span id="frameConfidenceValue" class="text-xs font-bold">0%</span>
+                        </div>
+                        <div class="confidence-bar">
+                            <div id="frameConfidenceFill" class="confidence-fill" style="width: 0%; background: #ef4444;"></div>
+                        </div>
+                        <div id="frameMeasureInfo" class="text-xs text-slate-400 mt-2 text-center">Aguardando detecção...</div>
+                    </div>
+                    
+                    <button class="capture-btn" id="frameCaptureBtn" onclick="captureFrameMeasurement()" disabled></button>
+                </div>
+
+                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mt-4">
+                    <p class="text-xs text-emerald-800 text-center">
+                        <strong>Como funciona:</strong>
+                        <br>1. Digite o comprimento do aro de cada lente
+                        <br>2. O sistema detecta as pupilas automaticamente
+                        <br>3. Calcula a escala usando o tamanho do aro
+                        <br>4. Mede a distância do centro da pupila até a borda inferior
+                    </p>
+                </div>
+
+                <div class="flex gap-3 mt-4">
+                    <button onclick="stopFrameCamera()" class="btn-secondary flex-1">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 6: Frame Results -->
+        <div id="step6" class="step">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-900 mb-4 text-center">Resultados - Altura Pupilar</h2>
+                
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="measure-card">
+                        <div class="measure-label">Altura Pupilar OD</div>
+                        <div><span id="frameHeightOD" class="measure-value text-emerald-600">--</span><span class="measure-unit">mm</span></div>
+                        <p class="text-xs text-slate-500 mt-1">Centro pupila → borda inferior</p>
+                    </div>
+                    <div class="measure-card">
+                        <div class="measure-label">Altura Pupilar OE</div>
+                        <div><span id="frameHeightOE" class="measure-value text-emerald-600">--</span><span class="measure-unit">mm</span></div>
+                        <p class="text-xs text-slate-500 mt-1">Centro pupila → borda inferior</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="measure-card">
+                        <div class="measure-label">Distância Topo OD</div>
+                        <div><span id="frameTopOD" class="measure-value text-red-600">--</span><span class="measure-unit">mm</span></div>
+                        <p class="text-xs text-slate-500 mt-1">Centro pupila → borda superior</p>
+                    </div>
+                    <div class="measure-card">
+                        <div class="measure-label">Distância Topo OE</div>
+                        <div><span id="frameTopOE" class="measure-value text-red-600">--</span><span class="measure-unit">mm</span></div>
+                        <p class="text-xs text-slate-500 mt-1">Centro pupila → borda superior</p>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p class="text-xs text-blue-800 text-center">
+                        <strong>Definição:</strong> Altura pupilar = distância do centro da pupila até a borda inferior da lente.
+                        <br>Esta é a medida padrão utilizada em óptica para posicionamento de lentes.
+                    </p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="goToStep(5)" class="btn-secondary flex-1">Voltar</button>
+                    <button onclick="showFinalResults()" class="btn-primary flex-1">Ver Todos os Resultados</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 7: Final Results -->
+        <div id="step7" class="step">
             <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center">
                 <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                 </div>
-                <h2 class="text-2xl font-bold text-slate-900 mb-2">Medição Concluída</h2>
-                
+                <h2 class="text-2xl font-bold text-slate-900 mb-4">Medição Concluída</h2>
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 text-left">
                     <p class="text-xs text-slate-500 mb-1">Paciente</p>
                     <p id="resultName" class="text-base font-semibold text-slate-900 mb-3">--</p>
                     <p class="text-xs text-slate-500 mb-1">Data</p>
                     <p id="resultDate" class="text-base font-semibold text-slate-900 mb-4">--</p>
-                    <p class="text-xs text-slate-500 mb-1">Distância Pupilar (DP)</p>
-                    <div class="flex items-baseline">
-                        <span id="resultValue" class="text-4xl font-bold text-blue-600">--</span>
-                        <span class="text-lg text-slate-500 ml-1">mm</span>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div><p class="text-xs text-slate-500">DP Total</p><p id="resultDPTotal" class="text-lg font-bold text-blue-600">-- mm</p></div>
+                        <div><p class="text-xs text-slate-500">Confiança</p><p id="resultConfidence" class="text-lg font-bold text-emerald-600">--%</p></div>
                     </div>
-                    <div class="mt-3 pt-3 border-t border-slate-200">
-                        <p class="text-xs text-slate-500 mb-1">Dispositivo</p>
-                        <p id="resultDevice" class="text-xs text-slate-600">--</p>
-                        <p class="text-xs text-slate-500 mt-2 mb-1">Fator de Calibração</p>
-                        <p id="resultCalibration" class="text-xs text-slate-600">--</p>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div><p class="text-xs text-slate-500">DP OD / OE</p><p id="resultDPMono" class="text-sm font-bold text-slate-700">-- / -- mm</p></div>
+                        <div><p class="text-xs text-slate-500">Altura Pupilar</p><p id="resultHeight" class="text-sm font-bold text-slate-700">-- / -- mm</p></div>
+                    </div>
+                    <div id="frameResultsSection" class="hidden border-t border-slate-200 pt-3 mt-3">
+                        <p class="text-xs text-slate-500 mb-2">Medições com Armação:</p>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <div><p class="text-xs text-slate-500">Aro OD</p><p id="resultFrameWidthOD" class="text-sm font-bold text-blue-700">-- mm</p></div>
+                            <div><p class="text-xs text-slate-500">Aro OE</p><p id="resultFrameWidthOE" class="text-sm font-bold text-blue-700">-- mm</p></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><p class="text-xs text-slate-500">Alt. Pupilar OD / OE</p><p id="resultFrameHeight" class="text-sm font-bold text-emerald-700">-- / -- mm</p></div>
+                            <div><p class="text-xs text-slate-500">Topo OD / OE</p><p id="resultFrameTop" class="text-sm font-bold text-red-700">-- / -- mm</p></div>
+                        </div>
                     </div>
                 </div>
-
                 <button onclick="shareWhatsApp()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-lg w-full flex items-center justify-center mb-3 transition-colors">
                     <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                     Compartilhar no WhatsApp
                 </button>
-
                 <div class="text-xs text-slate-500 mb-6 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                    <strong>Nota:</strong> Esta é uma estimativa baseada em referência visual com calibração automática para seu dispositivo. Para prescrições médicas, consulte sempre um oftalmologista ou óptico profissional.
+                    <strong>Nota:</strong> Medição auxiliada por IA. Para prescrições, consulte um profissional.
                 </div>
-
                 <button onclick="resetApp()" class="btn-secondary">Nova Medição</button>
             </div>
         </div>
-
     </main>
 
     <footer class="p-4 text-center text-xs text-slate-400">
-        &copy; 2026 Medidor Óptico By Willian L. Ferramenta de auxílio, não substitui avaliação profissional.
+        &copy; 2026 Medidor Óptico By Willian L.
     </footer>
 
+    <!-- MediaPipe Face Mesh -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
     <script>
-        // State
-        let currentStep = 1;
-        let image = new Image();
-        let imgNaturalWidth = 0;
-        let imgNaturalHeight = 0;
-        let videoStream = null;
-        let analysisInterval = null;
-        let currentCameraMode = 'user'; // 'user' = frontal, 'environment' = traseira
-        let deviceInfo = null; // Informações do dispositivo para calibração
-        
-        // Calibration points
-        let refPoints = [{x: 0.3, y: 0.2}, {x: 0.7, y: 0.2}];
-        let activeRefPoint = -1;
+    // ============ APP STATE ============
+    let currentStep = 1;
+    let currentCameraMode = 'user';
+    let videoStream = null;
+    let mpCamera = null;
+    let faceMesh = null;
+    let isFaceMeshReady = false;
+    let latestLandmarks = null;
+    let latestConfidence = 0;
+    let calibrationMode = false;
+    let calibrationScale = 1.0; // mm per pixel
+    let capturedMeasurements = null;
 
-        // Measurement points
-        let pupilPoints = [{x: 0.4, y: 0.5}, {x: 0.6, y: 0.5}];
-        let activePupilPoint = -1;
+    // MediaPipe Face Mesh landmark indices
+    const LANDMARKS = {
+        LEFT_IRIS: [468, 469, 470, 471, 472],
+        RIGHT_IRIS: [473, 474, 475, 476, 477],
+        LEFT_EYE_OUTER: 33,
+        LEFT_EYE_INNER: 133,
+        RIGHT_EYE_OUTER: 362,
+        RIGHT_EYE_INNER: 263,
+        NOSE_TIP: 1,
+        NOSE_BRIDGE: 6,
+        NOSE_BOTTOM: 2,
+        FACE_LEFT: 234,
+        FACE_RIGHT: 454,
+        CHIN: 152,
+        FOREHEAD: 10,
+        LEFT_EYE_TOP: 159,
+        LEFT_EYE_BOTTOM: 145,
+        RIGHT_EYE_TOP: 386,
+        RIGHT_EYE_BOTTOM: 374,
+        // Face contour for overlay
+        FACE_OVAL: [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109]
+    };
 
-        const STANDARD_CARD_WIDTH_MM = 85.6;
+    // Average human measurements for scale estimation (mm)
+    const AVG_FACE_WIDTH = 137.0;    // Average bizygomatic width
+    const AVG_IPD = 63.0;            // Average interpupillary distance
+    const AVG_EYE_WIDTH = 30.0;      // Average eye width
 
-        // Device detection and calibration
-        function detectDevice() {
-            const ua = navigator.userAgent;
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-            const isIOS = /iPhone|iPad|iPod/i.test(ua);
-            const isAndroid = /Android/i.test(ua);
+    // ============ DEVICE DETECTION ============
+    function detectDevice() {
+        const ua = navigator.userAgent;
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+        const isIOS = /iPhone|iPad|iPod/i.test(ua);
+        return {
+            isMobile, isIOS,
+            isAndroid: /Android/i.test(ua),
+            pixelRatio: window.devicePixelRatio || 1,
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height
+        };
+    }
+    const deviceInfo = detectDevice();
+
+    // ============ NAVIGATION ============
+    function goToStep(step) {
+        document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+        document.getElementById(`step${step}`).classList.add('active');
+        currentStep = step;
+    }
+
+    // ============ CAMERA FUNCTIONS ============
+    async function startCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Seu navegador não suporta acesso à câmera. Use Chrome ou Safari.');
+            return;
+        }
+        try {
+            // Initialize MediaPipe Face Mesh first
+            await initFaceMesh();
             
-            // Detect screen characteristics
-            const screenWidth = window.screen.width;
-            const screenHeight = window.screen.height;
-            const pixelRatio = window.devicePixelRatio || 1;
-            
-            // Estimate device type and calibration factors
-            let deviceType = 'desktop';
-            let calibrationFactor = 1.0;
-            
-            if (isMobile) {
-                deviceType = 'mobile';
-                
-                // Mobile devices typically need correction factors
-                // These are empirical values based on testing
-                if (isIOS) {
-                    // iOS devices tend to have more accurate cameras
-                    calibrationFactor = 1.05; // 5% correction
-                } else if (isAndroid) {
-                    // Android devices vary widely, use screen size as proxy
-                    if (screenWidth < 400) {
-                        // Small phones
-                        calibrationFactor = 1.12; // 12% correction
-                    } else if (screenWidth < 500) {
-                        // Medium phones
-                        calibrationFactor = 1.08; // 8% correction
-                    } else {
-                        // Large phones/tablets
-                        calibrationFactor = 1.05; // 5% correction
-                    }
-                }
-            } else {
-                // Desktop/laptop
-                deviceType = 'desktop';
-                calibrationFactor = 1.0; // No correction needed
-            }
-            
-            return {
-                type: deviceType,
-                isMobile: isMobile,
-                isIOS: isIOS,
-                isAndroid: isAndroid,
-                screenWidth: screenWidth,
-                screenHeight: screenHeight,
-                pixelRatio: pixelRatio,
-                calibrationFactor: calibrationFactor,
-                // Additional parameters for detection algorithm
-                detectionParams: {
-                    edgeThreshold: isMobile ? 40 : 50, // Lower threshold for mobile (more sensitive)
-                    minCardWidth: isMobile ? 0.25 : 0.3, // Min card width ratio
-                    maxCardWidth: isMobile ? 0.85 : 0.8, // Max card width ratio
-                    searchRegionTop: isMobile ? 0.05 : 0.1, // Search more of the image on mobile
-                    searchRegionBottom: isMobile ? 0.6 : 0.5
+            const constraints = {
+                video: {
+                    facingMode: currentCameraMode,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
                 }
             };
-        }
-
-        // Initialize device info on load
-        deviceInfo = detectDevice();
-
-        // Camera functions
-        async function startCamera() {
-            // Check if camera API is available
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                console.log('Camera API not available, using fallback upload');
-                showUploadFallback();
-                return;
-            }
+            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+            const video = document.getElementById('videoElement');
+            video.srcObject = videoStream;
             
-            try {
-                const constraints = {
-                    video: {
-                        facingMode: currentCameraMode,
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                };
-                
-                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-                const video = document.getElementById('videoElement');
-                video.srcObject = videoStream;
-                
-                // Apply mirror effect for front camera
-                if (currentCameraMode === 'user') {
-                    video.classList.add('mirror');
-                } else {
-                    video.classList.remove('mirror');
-                }
-                
-                goToStep(2);
-                
-                // Show camera label briefly
-                showCameraLabel();
-                
-                // Start real-time distance analysis
-                setTimeout(startDistanceAnalysis, 500);
-                
-            } catch (err) {
-                console.error('Erro ao acessar câmera:', err);
-                // Show fallback upload option
-                showUploadFallback();
-            }
-        }
-
-        async function toggleCamera() {
-            // Switch camera mode
-            currentCameraMode = currentCameraMode === 'user' ? 'environment' : 'user';
-            
-            // Stop current stream
-            stopCamera();
-            
-            // Restart with new camera
-            try {
-                const constraints = {
-                    video: {
-                        facingMode: currentCameraMode,
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                };
-                
-                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-                const video = document.getElementById('videoElement');
-                video.srcObject = videoStream;
-                
-                // Apply mirror effect for front camera
-                if (currentCameraMode === 'user') {
-                    video.classList.add('mirror');
-                } else {
-                    video.classList.remove('mirror');
-                }
-                
-                // Show camera label
-                showCameraLabel();
-                
-                // Restart distance analysis
-                setTimeout(startDistanceAnalysis, 500);
-                
-            } catch (err) {
-                console.error('Erro ao alternar câmera:', err);
-                // Revert to previous mode
-                currentCameraMode = currentCameraMode === 'user' ? 'environment' : 'user';
-                alert('Não foi possível alternar a câmera. Verifique se o dispositivo possui câmera ' + 
-                      (currentCameraMode === 'user' ? 'frontal' : 'traseira') + '.');
-            }
-        }
-
-        function showCameraLabel() {
-            const label = document.getElementById('cameraLabel');
-            label.textContent = currentCameraMode === 'user' ? '📱 Frontal' : '📷 Traseira';
-            label.classList.add('show');
-            
-            // Hide after 2 seconds
-            setTimeout(() => {
-                label.classList.remove('show');
-            }, 2000);
-        }
-
-        function showUploadFallback() {
-            // Create upload interface when camera is not available
-            const step2Content = document.querySelector('#step2 > div');
-            step2Content.innerHTML = `
-                <h2 class="text-lg font-bold text-slate-900 mb-2 text-center">Captura de Imagem</h2>
-                <p class="text-sm text-slate-600 mb-4 text-center">A câmera não está disponível. Faça upload de uma foto ou tente novamente.</p>
-                
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                    <p class="text-xs text-yellow-800">
-                        <strong>Nota:</strong> Para usar a câmera ao vivo, acesse esta página via HTTPS ou localhost.
-                    </p>
-                </div>
-                
-                <label class="block w-full cursor-pointer mb-4">
-                    <input type="file" id="fallbackImageInput" accept="image/*" capture="user" class="hidden" onchange="handleFallbackUpload(event)">
-                    <div class="bg-blue-50 border-2 border-dashed border-blue-300 rounded-xl p-8 hover:bg-blue-100 transition-colors">
-                        <svg class="w-12 h-12 text-blue-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                        <span class="text-blue-700 font-semibold">Tocar para abrir câmera ou escolher da galeria</span>
-                    </div>
-                </label>
-                
-                <button onclick="retryCamera()" class="btn-primary mb-3">Tentar Câmera Novamente</button>
-                <button onclick="goToStep(1)" class="btn-secondary">Voltar</button>
-            `;
+            if (currentCameraMode === 'user') video.classList.add('mirror');
+            else video.classList.remove('mirror');
             
             goToStep(2);
-        }
-
-        function handleFallbackUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                image = new Image();
-                image.onload = function() {
-                    imgNaturalWidth = image.width;
-                    imgNaturalHeight = image.height;
-                    goToStep(3);
-                };
-                image.src = e.target.result;
+            
+            // Start sending frames to Face Mesh
+            video.onloadedmetadata = () => {
+                startFaceDetection(video);
             };
-            reader.readAsDataURL(file);
+            if (video.readyState >= 2) startFaceDetection(video);
+            
+        } catch (err) {
+            console.error('Camera error:', err);
+            alert('Não foi possível acessar a câmera. Verifique as permissões.');
         }
+    }
 
-        function retryCamera() {
-            // Restore original step 2 content and try camera again
-            location.reload();
-        }
-
-        function stopCamera() {
-            if (videoStream) {
-                videoStream.getTracks().forEach(track => track.stop());
-                videoStream = null;
-            }
-            if (analysisInterval) {
-                clearInterval(analysisInterval);
-                analysisInterval = null;
-            }
-        }
-
-        function stopCameraAndGoBack() {
-            stopCamera();
-            goToStep(1);
-        }
-
-        function startDistanceAnalysis() {
+    async function toggleCamera() {
+        currentCameraMode = currentCameraMode === 'user' ? 'environment' : 'user';
+        stopCamera();
+        try {
+            const constraints = {
+                video: { facingMode: currentCameraMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+            };
+            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
             const video = document.getElementById('videoElement');
-            const canvas = document.getElementById('analysisCanvas');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            
-            // Wait for video to be ready
-            video.addEventListener('loadedmetadata', () => {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-            });
-            
-            // Also try immediately in case metadata is already loaded
-            if (video.readyState >= 1) {
-                canvas.width = video.videoWidth || 640;
-                canvas.height = video.videoHeight || 480;
-            }
-            
-            analysisInterval = setInterval(() => {
-                if (!videoStream || video.readyState < 2) return;
-                
-                // Update canvas size if needed
-                if (video.videoWidth && canvas.width !== video.videoWidth) {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                }
-                
-                // Draw current video frame to canvas for analysis
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Analyze the guide region to detect card and estimate distance
-                analyzeCardDistance(ctx, canvas.width, canvas.height);
-                
-            }, 150); // Analyze every 150ms for smoother feedback
+            video.srcObject = videoStream;
+            if (currentCameraMode === 'user') video.classList.add('mirror');
+            else video.classList.remove('mirror');
+            video.onloadedmetadata = () => startFaceDetection(video);
+            if (video.readyState >= 2) startFaceDetection(video);
+        } catch (err) {
+            console.error('Toggle camera error:', err);
+            currentCameraMode = currentCameraMode === 'user' ? 'environment' : 'user';
         }
+    }
 
-        function analyzeCardDistance(ctx, width, height) {
-            // Guide region matches the CSS overlay position
-            // top: 18%, width: 55%, aspect-ratio: 1.586:1
-            const guideTop = Math.floor(height * 0.18);
-            const guideWidth = Math.floor(width * 0.55);
-            const guideHeight = Math.floor(guideWidth / 1.586);
-            const guideLeft = Math.floor((width - guideWidth) / 2);
-            
-            // Ensure we don't go out of bounds
-            if (guideLeft < 0 || guideTop < 0 || 
-                guideLeft + guideWidth > width || 
-                guideTop + guideHeight > height) {
-                return;
-            }
-            
-            // Extract the guide region
-            const regionData = ctx.getImageData(guideLeft, guideTop, guideWidth, guideHeight);
-            
-            // 1. Detect if there's a card-like object in the guide region
-            const cardDetection = detectCardInRegion(regionData, guideWidth, guideHeight);
-            
-            // 2. Calculate how much of the guide is filled by the card
-            const fillRatio = cardDetection.fillRatio;
-            
-            // 3. Calculate edge strength to confirm card presence
-            const edgeStrength = cardDetection.edgeStrength;
-            
-            // 4. Determine if card is detected and estimate distance
-            const cardDetected = fillRatio > 0.3 && edgeStrength > 0.15;
-            
-            let estimatedDistance;
-            let confidence;
-            
-            if (cardDetected) {
-                // Card fills the guide - use fill ratio to estimate distance
-                // Ideal: card fills 75-95% of guide width
-                // Too small (far): fill < 60%
-                // Too big (close): fill > 95%
-                
-                // At 40cm (ideal), card should fill ~85% of guide
-                // Distance is inversely proportional to fill ratio
-                const idealFill = 0.85;
-                const idealDistance = 40;
-                
-                estimatedDistance = Math.round(idealDistance * (idealFill / fillRatio));
-                confidence = Math.min(1, edgeStrength * 2) * Math.min(1, fillRatio * 1.5);
-            } else {
-                // No card detected - use face/scene analysis as fallback
-                const faceSize = estimateFaceSize(ctx, width, height);
-                estimatedDistance = Math.round(40 * (0.35 / Math.max(0.1, faceSize)));
-                confidence = 0.3; // Low confidence
-            }
-            
-            // Clamp distance to reasonable range
-            estimatedDistance = Math.max(15, Math.min(100, estimatedDistance));
-            
-            // Update UI with results
-            updateLiveDistance(estimatedDistance, cardDetected, fillRatio, confidence);
-        }
+    function stopCamera() {
+        if (mpCamera) { mpCamera.stop(); mpCamera = null; }
+        if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+    }
 
-        function detectCardInRegion(imageData, width, height) {
-            const data = imageData.data;
-            const totalPixels = width * height;
-            
-            // Step 1: Convert to grayscale and find edges
-            const gray = new Uint8Array(totalPixels);
-            for (let i = 0; i < totalPixels; i++) {
-                const idx = i * 4;
-                gray[i] = (data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114) | 0;
-            }
-            
-            // Step 2: Detect horizontal and vertical edges (card has strong straight edges)
-            let horizontalEdges = 0;
-            let verticalEdges = 0;
-            const edgeThreshold = 40;
-            
-            // Sample every 2nd pixel for performance
-            for (let y = 2; y < height - 2; y += 2) {
-                for (let x = 2; x < width - 2; x += 2) {
-                    const center = gray[y * width + x];
-                    
-                    // Horizontal edge detection
-                    const left = gray[y * width + (x - 2)];
-                    const right = gray[y * width + (x + 2)];
-                    const hDiff = Math.abs(right - left);
-                    if (hDiff > edgeThreshold) horizontalEdges++;
-                    
-                    // Vertical edge detection
-                    const top = gray[(y - 2) * width + x];
-                    const bottom = gray[(y + 2) * width + x];
-                    const vDiff = Math.abs(bottom - top);
-                    if (vDiff > edgeThreshold) verticalEdges++;
-                }
-            }
-            
-            const sampledPixels = (width / 2) * (height / 2);
-            const hEdgeRatio = horizontalEdges / sampledPixels;
-            const vEdgeRatio = verticalEdges / sampledPixels;
-            
-            // Cards have both horizontal and vertical edges
-            const edgeStrength = Math.min(1, (hEdgeRatio + vEdgeRatio) * 2);
-            
-            // Step 3: Calculate fill ratio - how much of the region has a solid color
-            // Cards are typically solid colored with some text/elements
-            let solidPixels = 0;
-            const blockSize = 8; // Analyze in 8x8 blocks
-            
-            for (let by = 0; by < height - blockSize; by += blockSize) {
-                for (let bx = 0; bx < width - blockSize; bx += blockSize) {
-                    let sumR = 0, sumG = 0, sumB = 0;
-                    let count = 0;
-                    
-                    for (let dy = 0; dy < blockSize; dy += 2) {
-                        for (let dx = 0; dx < blockSize; dx += 2) {
-                            const idx = ((by + dy) * width + (bx + dx)) * 4;
-                            sumR += data[idx];
-                            sumG += data[idx + 1];
-                            sumB += data[idx + 2];
-                            count++;
-                        }
-                    }
-                    
-                    const avgR = sumR / count;
-                    const avgG = sumG / count;
-                    const avgB = sumB / count;
-                    
-                    // Calculate variance within block
-                    let variance = 0;
-                    for (let dy = 0; dy < blockSize; dy += 2) {
-                        for (let dx = 0; dx < blockSize; dx += 2) {
-                            const idx = ((by + dy) * width + (bx + dx)) * 4;
-                            const dr = data[idx] - avgR;
-                            const dg = data[idx + 1] - avgG;
-                            const db = data[idx + 2] - avgB;
-                            variance += (dr * dr + dg * dg + db * db) / 3;
-                        }
-                    }
-                    variance /= count;
-                    
-                    // Low variance = solid color (part of card)
-                    if (variance < 400) {
-                        solidPixels++;
-                    }
-                }
-            }
-            
-            const totalBlocks = Math.floor(width / blockSize) * Math.floor(height / blockSize);
-            const fillRatio = solidPixels / totalBlocks;
-            
-            return {
-                fillRatio: fillRatio,
-                edgeStrength: edgeStrength,
-                hEdgeRatio: hEdgeRatio,
-                vEdgeRatio: vEdgeRatio
-            };
-        }
+    function stopCameraAndGoBack() {
+        stopCamera();
+        goToStep(1);
+    }
 
-        function estimateFaceSize(ctx, width, height) {
-            // Analyze the center region of the image where the face should be
-            const centerX = width / 2;
-            const centerY = height / 2;
-            const regionSize = Math.min(width, height) * 0.4;
-            
-            const regionData = ctx.getImageData(
-                centerX - regionSize / 2,
-                centerY - regionSize / 2,
-                regionSize,
-                regionSize
-            );
-            
-            const data = regionData.data;
-            let skinPixels = 0;
-            let totalPixels = data.length / 4;
-            
-            // Count skin-tone pixels
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                // Simple skin detection
-                if (r > 95 && g > 40 && b > 20 &&
-                    r > g && r > b &&
-                    Math.abs(r - g) > 15 &&
-                    r - b > 15) {
-                    skinPixels++;
-                }
-            }
-            
-            const skinRatio = skinPixels / totalPixels;
-            
-            // Map skin ratio to face size estimate
-            // Higher skin ratio = closer face = smaller distance
-            return Math.min(1, Math.max(0.1, skinRatio * 2));
-        }
-
-        function updateLiveDistance(distance, cardDetected, fillRatio, confidence) {
-            const valueEl = document.getElementById('liveDistanceValue');
-            const statusEl = document.getElementById('liveDistanceStatus');
-            const barFill = document.getElementById('distanceBarFill');
-            const captureBtn = document.getElementById('captureBtn');
-            const guideOverlay = document.getElementById('guideOverlay');
-            
-            valueEl.textContent = `${distance} cm`;
-            
-            // Update bar position (map 15-80cm to 0-100%)
-            const barPosition = Math.min(100, Math.max(0, ((distance - 15) / 65) * 100));
-            barFill.style.width = `${barPosition}%`;
-            
-            // Remove all state classes
-            guideOverlay.classList.remove('optimal', 'too-close', 'too-far');
-            
-            if (distance >= 35 && distance <= 45) {
-                // Optimal distance
-                valueEl.className = 'distance-value optimal';
-                guideOverlay.classList.add('optimal');
-                
-                if (cardDetected && confidence > 0.5) {
-                    statusEl.textContent = '✓ Cartão detectado! Distância ideal.';
-                } else {
-                    statusEl.textContent = '✓ Distância ideal! Alinhe o cartão no guia.';
-                }
-                statusEl.className = 'text-xs mt-2 text-center text-emerald-400 font-semibold';
-                barFill.style.background = '#10b981';
-                captureBtn.disabled = false;
-            } else if (distance < 35) {
-                // Too close
-                valueEl.className = 'distance-value too-close';
-                guideOverlay.classList.add('too-close');
-                statusEl.textContent = '✗ Muito perto! Afaste para 35-45 cm';
-                statusEl.className = 'text-xs mt-2 text-center text-red-400 font-semibold';
-                barFill.style.background = '#ef4444';
-                captureBtn.disabled = true;
-            } else {
-                // Too far
-                valueEl.className = 'distance-value too-far';
-                guideOverlay.classList.add('too-far');
-                statusEl.textContent = '✗ Muito longe! Aproxime para 35-45 cm';
-                statusEl.className = 'text-xs mt-2 text-center text-amber-400 font-semibold';
-                barFill.style.background = '#f59e0b';
-                captureBtn.disabled = true;
-            }
-        }
-
-        function captureImage() {
-            const video = document.getElementById('videoElement');
-            const captureCanvas = document.createElement('canvas');
-            captureCanvas.width = video.videoWidth;
-            captureCanvas.height = video.videoHeight;
-            
-            const ctx = captureCanvas.getContext('2d');
-            
-            // If using front camera (mirror mode), flip the image horizontally for capture
-            if (currentCameraMode === 'user') {
-                ctx.translate(captureCanvas.width, 0);
-                ctx.scale(-1, 1);
-            }
-            
-            ctx.drawImage(video, 0, 0);
-            
-            // Convert to image
-            const dataURL = captureCanvas.toDataURL('image/jpeg', 0.9);
-            
-            image = new Image();
-            image.onload = function() {
-                imgNaturalWidth = image.width;
-                imgNaturalHeight = image.height;
-                stopCamera();
-                
-                // Show loading state
-                const statusDiv = document.getElementById('calibrationStatus');
-                statusDiv.innerHTML = `
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
-                        <div class="flex items-center justify-center">
-                            <svg class="animate-spin h-5 w-5 text-blue-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <p class="text-sm text-blue-800 font-semibold">
-                                Detectando cartão automaticamente...
-                            </p>
-                        </div>
-                    </div>
-                `;
-                
-                goToStep(3);
-                
-                // Try to auto-detect card borders with a small delay to allow UI to update
-                setTimeout(() => {
-                    const cardDetected = autoDetectCardBorders(captureCanvas);
-                    
-                    // Update calibration status message
-                    if (cardDetected) {
-                        statusDiv.innerHTML = `
-                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-2">
-                                <p class="text-sm text-emerald-800 text-center font-semibold">
-                                    ✓ Cartão detectado automaticamente!
-                                </p>
-                                <p class="text-xs text-emerald-700 text-center mt-1">
-                                    Ajuste os pontos se necessário ou avance para o próximo passo.
-                                </p>
-                            </div>
-                        `;
-                    } else {
-                        statusDiv.innerHTML = `
-                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
-                                <p class="text-sm text-amber-800 text-center font-semibold">
-                                    ⚠️ Cartão não detectado automaticamente
-                                </p>
-                                <p class="text-xs text-amber-700 text-center mt-1">
-                                    Arraste os pontos azuis manualmente para as bordas do cartão.
-                                </p>
-                            </div>
-                        `;
-                        // Reset to default positions for manual calibration
-                        refPoints = [{x: 0.3, y: 0.2}, {x: 0.7, y: 0.2}];
-                        initCalibrationCanvas();
-                    }
-                }, 100);
-            };
-            image.src = dataURL;
-        }
-
-        function autoDetectCardBorders(canvas) {
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            const width = canvas.width;
-            const height = canvas.height;
-            
-            console.log('=== Card Detection Started ===');
-            console.log('Image size:', width, 'x', height);
-            console.log('Device:', deviceInfo.type, deviceInfo.isIOS ? 'iOS' : deviceInfo.isAndroid ? 'Android' : 'Desktop');
-            
-            // Get image data
-            const imageData = ctx.getImageData(0, 0, width, height);
-            const data = imageData.data;
-            
-            // Step 1: Convert to grayscale with enhanced contrast
-            const gray = new Uint8Array(width * height);
-            for (let i = 0; i < width * height; i++) {
-                const idx = i * 4;
-                let grayValue = (data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114) | 0;
-                
-                // Apply contrast enhancement
-                const mean = 128;
-                const contrast = deviceInfo.isMobile ? 1.4 : 1.2;
-                grayValue = Math.max(0, Math.min(255, mean + contrast * (grayValue - mean)));
-                
-                gray[i] = grayValue;
-            }
-            
-            // Step 2: Apply Gaussian blur to reduce noise
-            const blurred = new Uint8Array(width * height);
-            for (let y = 1; y < height - 1; y++) {
-                for (let x = 1; x < width - 1; x++) {
-                    const sum = 
-                        gray[(y-1) * width + (x-1)] + gray[(y-1) * width + x] * 2 + gray[(y-1) * width + (x+1)] +
-                        gray[y * width + (x-1)] * 2 + gray[y * width + x] * 4 + gray[y * width + (x+1)] * 2 +
-                        gray[(y+1) * width + (x-1)] + gray[(y+1) * width + x] * 2 + gray[(y+1) * width + (x+1)];
-                    blurred[y * width + x] = sum / 16;
-                }
-            }
-            
-            // Step 3: Edge detection with adaptive threshold
-            const edges = new Uint8Array(width * height);
-            const edgeThreshold = deviceInfo.isMobile ? 35 : 45;
-            
-            for (let y = 1; y < height - 1; y++) {
-                for (let x = 1; x < width - 1; x++) {
-                    const gx = 
-                        -blurred[(y-1) * width + (x-1)] + blurred[(y-1) * width + (x+1)] +
-                        -2 * blurred[y * width + (x-1)] + 2 * blurred[y * width + (x+1)] +
-                        -blurred[(y+1) * width + (x-1)] + blurred[(y+1) * width + (x+1)];
-                    
-                    const gy = 
-                        -blurred[(y-1) * width + (x-1)] - 2 * blurred[(y-1) * width + x] - blurred[(y-1) * width + (x+1)] +
-                        blurred[(y+1) * width + (x-1)] + 2 * blurred[(y+1) * width + x] + blurred[(y+1) * width + (x+1)];
-                    
-                    const magnitude = Math.sqrt(gx * gx + gy * gy);
-                    edges[y * width + x] = magnitude > edgeThreshold ? 255 : 0;
-                }
-            }
-            
-            // Count edges for debugging
-            let edgeCount = 0;
-            for (let i = 0; i < edges.length; i++) {
-                if (edges[i] > 0) edgeCount++;
-            }
-            console.log('Edge detection complete. Edge pixels:', edgeCount, '(', (edgeCount / edges.length * 100).toFixed(2), '%)');
-            
-            // Step 4: Multi-strategy card detection
-            const cardAspectRatio = 1.586;
-            let bestRect = null;
-            let bestScore = 0;
-            
-            // Strategy 1: Find horizontal and vertical lines
-            const searchTop = Math.floor(height * 0.05);
-            const searchBottom = Math.floor(height * 0.65);
-            const searchLeft = Math.floor(width * 0.05);
-            const searchRight = Math.floor(width * 0.95);
-            
-            console.log('Search region:', { searchTop, searchBottom, searchLeft, searchRight });
-            
-            const horizontalLines = findHorizontalLines(edges, width, height, searchTop, searchBottom, searchLeft, searchRight);
-            const verticalLines = findVerticalLines(edges, width, height, searchTop, searchBottom, searchLeft, searchRight);
-            
-            console.log('Found', horizontalLines.length, 'horizontal lines and', verticalLines.length, 'vertical lines');
-            
-            // Try to form rectangles from lines
-            for (const h1 of horizontalLines) {
-                for (const h2 of horizontalLines) {
-                    if (Math.abs(h1.y - h2.y) < 15) continue;
-                    
-                    const rectHeight = Math.abs(h1.y - h2.y);
-                    
-                    for (const v1 of verticalLines) {
-                        for (const v2 of verticalLines) {
-                            if (Math.abs(v1.x - v2.x) < 15) continue;
-                            
-                            const rectWidth = Math.abs(v1.x - v2.x);
-                            const aspectRatio = rectWidth / rectHeight;
-                            
-                            // Check aspect ratio with tolerance
-                            const aspectDiff = Math.abs(aspectRatio - cardAspectRatio) / cardAspectRatio;
-                            if (aspectDiff < 0.4) { // 40% tolerance
-                                const cardWidthRatio = rectWidth / width;
-                                if (cardWidthRatio >= 0.2 && cardWidthRatio <= 0.9) {
-                                    const aspectScore = 1 - aspectDiff;
-                                    const edgeScore = (h1.strength + h2.strength + v1.strength + v2.strength) / 4;
-                                    const score = aspectScore * 0.6 + edgeScore * 0.4;
-                                    
-                                    if (score > bestScore) {
-                                        bestScore = score;
-                                        bestRect = {
-                                            x1: Math.min(v1.x, v2.x),
-                                            y1: Math.min(h1.y, h2.y),
-                                            x2: Math.max(v1.x, v2.x),
-                                            y2: Math.max(h1.y, h2.y),
-                                            score: score,
-                                            strategy: 'lines'
-                                        };
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            console.log('Strategy 1 (lines) result:', bestScore.toFixed(3));
-            
-            // Strategy 2: Scan for rectangular regions with high edge density
-            if (!bestRect || bestScore < 0.3) {
-                const scanRect = scanForCardRegion(edges, width, height, cardAspectRatio);
-                if (scanRect && scanRect.score > bestScore) {
-                    bestRect = scanRect;
-                    bestScore = scanRect.score;
-                    bestRect.strategy = 'scan';
-                }
-                console.log('Strategy 2 (scan) result:', bestScore.toFixed(3));
-            }
-            
-            // Strategy 3: Color-based detection (cards often have uniform color)
-            if (!bestRect || bestScore < 0.3) {
-                const colorRect = detectCardByColor(data, width, height, cardAspectRatio);
-                if (colorRect && colorRect.score > bestScore) {
-                    bestRect = colorRect;
-                    bestScore = colorRect.score;
-                    bestRect.strategy = 'color';
-                }
-                console.log('Strategy 3 (color) result:', bestScore.toFixed(3));
-            }
-            
-            console.log('Best detection result - Score:', bestScore.toFixed(3), 'Strategy:', bestRect?.strategy);
-            
-            if (bestRect && bestScore > 0.25) {
-                // Convert to normalized coordinates
-                refPoints[0] = {
-                    x: bestRect.x1 / width,
-                    y: (bestRect.y1 + bestRect.y2) / 2 / height
-                };
-                refPoints[1] = {
-                    x: bestRect.x2 / width,
-                    y: (bestRect.y1 + bestRect.y2) / 2 / height
-                };
-                
-                console.log('Card detected at:', refPoints);
-                console.log('=== Card Detection Complete ===');
-                
-                setTimeout(() => {
-                    const btn = document.getElementById('btnToStep4');
-                    if (btn) btn.disabled = false;
-                }, 100);
-                
-                return true;
-            }
-            
-            console.log('Card not detected');
-            console.log('=== Card Detection Complete ===');
-            return false;
-        }
-
-        function scanForCardRegion(edges, width, height, cardAspectRatio) {
-            let bestRect = null;
-            let bestScore = 0;
-            
-            const step = deviceInfo.isMobile ? 12 : 8;
-            const searchTop = Math.floor(height * 0.05);
-            const searchBottom = Math.floor(height * 0.65);
-            
-            for (let y1 = searchTop; y1 < searchBottom * 0.6; y1 += step) {
-                for (let y2 = y1 + 40; y2 < searchBottom; y2 += step) {
-                    const rectHeight = y2 - y1;
-                    const expectedWidth = rectHeight * cardAspectRatio;
-                    
-                    for (let x1 = Math.floor(width * 0.05); x1 < width - expectedWidth; x1 += step) {
-                        const x2 = x1 + expectedWidth;
-                        
-                        if (x2 >= width * 0.95) continue;
-                        
-                        // Calculate edge density along borders
-                        let topEdge = 0, bottomEdge = 0, leftEdge = 0, rightEdge = 0;
-                        let samples = 0;
-                        
-                        for (let x = x1; x < x2; x += 3) {
-                            if (edges[y1 * width + x] > 0) topEdge++;
-                            if (edges[y2 * width + x] > 0) bottomEdge++;
-                            samples++;
-                        }
-                        
-                        for (let y = y1; y < y2; y += 3) {
-                            if (edges[y * width + x1] > 0) leftEdge++;
-                            if (edges[y * width + x2] > 0) rightEdge++;
-                            samples++;
-                        }
-                        
-                        const edgeDensity = (topEdge + bottomEdge + leftEdge + rightEdge) / (samples * 2);
-                        
-                        if (edgeDensity > bestScore && edgeDensity > 0.15) {
-                            bestScore = edgeDensity;
-                            bestRect = {
-                                x1: x1,
-                                y1: y1,
-                                x2: x2,
-                                y2: y2,
-                                score: edgeDensity
-                            };
-                        }
-                    }
-                }
-            }
-            
-            return bestRect;
-        }
-
-        function detectCardByColor(data, width, height, cardAspectRatio) {
-            // Cards often have uniform color different from skin
-            const blockSize = 16;
-            const blocks = [];
-            
-            // Analyze image in blocks
-            for (let by = 0; by < height * 0.6; by += blockSize) {
-                for (let bx = 0; bx < width; bx += blockSize) {
-                    let sumR = 0, sumG = 0, sumB = 0, count = 0;
-                    
-                    for (let dy = 0; dy < blockSize && by + dy < height; dy += 2) {
-                        for (let dx = 0; dx < blockSize && bx + dx < width; dx += 2) {
-                            const idx = ((by + dy) * width + (bx + dx)) * 4;
-                            sumR += data[idx];
-                            sumG += data[idx + 1];
-                            sumB += data[idx + 2];
-                            count++;
-                        }
-                    }
-                    
-                    if (count > 0) {
-                        const avgR = sumR / count;
-                        const avgG = sumG / count;
-                        const avgB = sumB / count;
-                        
-                        // Check if this block is likely part of a card (not skin)
-                        const isSkin = (avgR > 95 && avgG > 40 && avgB > 20 &&
-                                       avgR > avgG && avgR > avgB &&
-                                       Math.abs(avgR - avgG) > 15 && avgR - avgB > 15);
-                        
-                        if (!isSkin) {
-                            blocks.push({ x: bx, y: by, r: avgR, g: avgG, b: avgB });
-                        }
-                    }
-                }
-            }
-            
-            // Find clusters of non-skin blocks that form a rectangle
-            if (blocks.length < 10) return null;
-            
-            // Find bounding box of non-skin blocks in upper region
-            let minX = width, maxX = 0, minY = height, maxY = 0;
-            let blockCount = 0;
-            
-            for (const block of blocks) {
-                if (block.y < height * 0.6) {
-                    minX = Math.min(minX, block.x);
-                    maxX = Math.max(maxX, block.x + blockSize);
-                    minY = Math.min(minY, block.y);
-                    maxY = Math.max(maxY, block.y + blockSize);
-                    blockCount++;
-                }
-            }
-            
-            if (blockCount < 8) return null;
-            
-            const rectWidth = maxX - minX;
-            const rectHeight = maxY - minY;
-            const aspectRatio = rectWidth / rectHeight;
-            
-            // Check if aspect ratio is close to card
-            const aspectDiff = Math.abs(aspectRatio - cardAspectRatio) / cardAspectRatio;
-            if (aspectDiff < 0.5 && rectWidth > width * 0.2) {
-                return {
-                    x1: minX,
-                    y1: minY,
-                    x2: maxX,
-                    y2: maxY,
-                    score: 0.3 * (1 - aspectDiff)
-                };
-            }
-            
-            return null;
-        }
-
-        function findHorizontalLines(edges, width, height, top, bottom, left, right) {
-            const lines = [];
-            const minLineLength = (right - left) * 0.25; // At least 25% of search width
-            
-            for (let y = top; y < bottom; y += 2) {
-                let lineStart = -1;
-                let lineLength = 0;
-                let edgeCount = 0;
-                
-                for (let x = left; x < right; x += 2) {
-                    if (edges[y * width + x] > 0) {
-                        if (lineStart === -1) lineStart = x;
-                        lineLength++;
-                        edgeCount++;
-                    } else {
-                        if (lineLength > minLineLength && edgeCount > lineLength * 0.4) {
-                            lines.push({
-                                y: y,
-                                x1: lineStart,
-                                x2: lineStart + lineLength * 2,
-                                strength: edgeCount / lineLength
-                            });
-                        }
-                        lineStart = -1;
-                        lineLength = 0;
-                        edgeCount = 0;
-                    }
-                }
-                
-                if (lineLength > minLineLength && edgeCount > lineLength * 0.4) {
-                    lines.push({
-                        y: y,
-                        x1: lineStart,
-                        x2: lineStart + lineLength * 2,
-                        strength: edgeCount / lineLength
-                    });
-                }
-            }
-            
-            // Merge close lines
-            return mergeCloseLines(lines, 'y', 8);
-        }
-
-        function findVerticalLines(edges, width, height, top, bottom, left, right) {
-            const lines = [];
-            const minLineLength = (bottom - top) * 0.25; // At least 25% of search height
-            
-            for (let x = left; x < right; x += 2) {
-                let lineStart = -1;
-                let lineLength = 0;
-                let edgeCount = 0;
-                
-                for (let y = top; y < bottom; y += 2) {
-                    if (edges[y * width + x] > 0) {
-                        if (lineStart === -1) lineStart = y;
-                        lineLength++;
-                        edgeCount++;
-                    } else {
-                        if (lineLength > minLineLength && edgeCount > lineLength * 0.4) {
-                            lines.push({
-                                x: x,
-                                y1: lineStart,
-                                y2: lineStart + lineLength * 2,
-                                strength: edgeCount / lineLength
-                            });
-                        }
-                        lineStart = -1;
-                        lineLength = 0;
-                        edgeCount = 0;
-                    }
-                }
-                
-                if (lineLength > minLineLength && edgeCount > lineLength * 0.4) {
-                    lines.push({
-                        x: x,
-                        y1: lineStart,
-                        y2: lineStart + lineLength * 2,
-                        strength: edgeCount / lineLength
-                    });
-                }
-            }
-            
-            // Merge close lines
-            return mergeCloseLines(lines, 'x', 8);
-        }
-
-        function mergeCloseLines(lines, coord, threshold) {
-            if (lines.length === 0) return [];
-            
-            const merged = [];
-            const used = new Set();
-            
-            for (let i = 0; i < lines.length; i++) {
-                if (used.has(i)) continue;
-                
-                let sum = lines[i][coord];
-                let count = 1;
-                let maxStrength = lines[i].strength;
-                used.add(i);
-                
-                for (let j = i + 1; j < lines.length; j++) {
-                    if (used.has(j)) continue;
-                    if (Math.abs(lines[j][coord] - lines[i][coord]) < threshold) {
-                        sum += lines[j][coord];
-                        count++;
-                        maxStrength = Math.max(maxStrength, lines[j].strength);
-                        used.add(j);
-                    }
-                }
-                
-                const mergedLine = { ...lines[i] };
-                mergedLine[coord] = sum / count;
-                mergedLine.strength = maxStrength;
-                merged.push(mergedLine);
-            }
-            
-            // Sort by strength and return top candidates
-            return merged.sort((a, b) => b.strength - a.strength).slice(0, 15);
-        }
-
-        function goToStep(step) {
-            document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
-            document.getElementById(`step${step}`).classList.add('active');
-            currentStep = step;
-
-            if (step === 3) {
-                setTimeout(initCalibrationCanvas, 100);
-            } else if (step === 4) {
-                setTimeout(initMeasurementCanvas, 100);
-            }
-        }
-
-        // Canvas Utilities
-        function setupCanvas(canvasId, points, pointClass, onPointUpdate) {
-            const canvas = document.getElementById(canvasId);
-            const ctx = canvas.getContext('2d');
-            const container = canvas.parentElement;
-            
-            function resize() {
-                canvas.width = container.clientWidth;
-                canvas.height = container.clientHeight;
-                draw();
-            }
-            window.addEventListener('resize', resize);
-            resize();
-
-            function getPos(e) {
-                const rect = canvas.getBoundingClientRect();
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                return {
-                    x: (clientX - rect.left) * (canvas.width / rect.width),
-                    y: (clientY - rect.top) * (canvas.height / rect.height)
-                };
-            }
-
-            function findPoint(pos) {
-                const threshold = 30;
-                for (let i = 0; i < points.length; i++) {
-                    const px = points[i].x * canvas.width;
-                    const py = points[i].y * canvas.height;
-                    const dist = Math.sqrt((pos.x - px)**2 + (pos.y - py)**2);
-                    if (dist < threshold) return i;
-                }
-                return -1;
-            }
-
-            function draw() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                const scale = Math.min(canvas.width / imgNaturalWidth, canvas.height / imgNaturalHeight);
-                const w = imgNaturalWidth * scale;
-                const h = imgNaturalHeight * scale;
-                const offsetX = (canvas.width - w) / 2;
-                const offsetY = (canvas.height - h) / 2;
-                
-                ctx.drawImage(image, offsetX, offsetY, w, h);
-
-                canvas.dataset.scale = scale;
-                canvas.dataset.offsetX = offsetX;
-                canvas.dataset.offsetY = offsetY;
-
-                points.forEach((p, i) => {
-                    const px = p.x * canvas.width;
-                    const py = p.y * canvas.height;
-                    
-                    ctx.beginPath();
-                    ctx.arc(px, py, 14, 0, Math.PI * 2);
-                    ctx.fillStyle = pointClass === 'ref' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)';
-                    ctx.fill();
-                    ctx.lineWidth = 2.5;
-                    ctx.strokeStyle = pointClass === 'ref' ? 'rgba(59, 130, 246, 0.9)' : 'rgba(16, 185, 129, 0.9)';
-                    ctx.stroke();
-
-                    ctx.beginPath();
-                    ctx.moveTo(px - 22, py);
-                    ctx.lineTo(px + 22, py);
-                    ctx.moveTo(px, py - 22);
-                    ctx.lineTo(px, py + 22);
-                    ctx.strokeStyle = pointClass === 'ref' ? 'rgba(37, 99, 235, 0.8)' : 'rgba(5, 150, 105, 0.8)';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    
-                    ctx.beginPath();
-                    ctx.arc(px, py, 3, 0, Math.PI * 2);
-                    ctx.fillStyle = 'white';
-                    ctx.fill();
-                    ctx.strokeStyle = pointClass === 'ref' ? 'rgba(37, 99, 235, 0.9)' : 'rgba(5, 150, 105, 0.9)';
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
+    // ============ MEDIAPIPE FACE MESH ============
+    async function initFaceMesh() {
+        if (faceMesh) return;
+        
+        return new Promise((resolve, reject) => {
+            try {
+                faceMesh = new FaceMesh({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
                 });
-
-                if (points.length === 2) {
-                    ctx.beginPath();
-                    ctx.moveTo(points[0].x * canvas.width, points[0].y * canvas.height);
-                    ctx.lineTo(points[1].x * canvas.width, points[1].y * canvas.height);
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                }
-            }
-
-            function onStart(e) {
-                e.preventDefault();
-                const pos = getPos(e);
-                const idx = findPoint(pos);
-                if (idx !== -1) {
-                    if (pointClass === 'ref') activeRefPoint = idx;
-                    else activePupilPoint = idx;
-                }
-            }
-
-            function onMove(e) {
-                e.preventDefault();
-                let activeIdx = pointClass === 'ref' ? activeRefPoint : activePupilPoint;
-                if (activeIdx === -1) return;
-                
-                const pos = getPos(e);
-                const fingerOffset = 60;
-                const adjustedY = pos.y - fingerOffset;
-                
-                points[activeIdx].x = pos.x / canvas.width;
-                points[activeIdx].y = adjustedY / canvas.height;
-                
-                points[activeIdx].x = Math.max(0, Math.min(1, points[activeIdx].x));
-                points[activeIdx].y = Math.max(0, Math.min(1, points[activeIdx].y));
-                
-                draw();
-                onPointUpdate();
-            }
-
-            function onEnd() {
-                activeRefPoint = -1;
-                activePupilPoint = -1;
-            }
-
-            canvas.addEventListener('mousedown', onStart);
-            canvas.addEventListener('mousemove', onMove);
-            canvas.addEventListener('mouseup', onEnd);
-            canvas.addEventListener('mouseleave', onEnd);
-            
-            canvas.addEventListener('touchstart', onStart, {passive: false});
-            canvas.addEventListener('touchmove', onMove, {passive: false});
-            canvas.addEventListener('touchend', onEnd);
-
-            return draw;
-        }
-
-        function initCalibrationCanvas() {
-            setupCanvas('calibrationCanvas', refPoints, 'ref', () => {
-                const dist = Math.abs(refPoints[0].x - refPoints[1].x);
-                document.getElementById('btnToStep4').disabled = dist < 0.1;
-            });
-        }
-
-        function retryAutoDetection() {
-            // Create a temporary canvas with the current image
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = imgNaturalWidth;
-            tempCanvas.height = imgNaturalHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(image, 0, 0);
-            
-            // Show loading state
-            const statusDiv = document.getElementById('calibrationStatus');
-            statusDiv.innerHTML = `
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
-                    <div class="flex items-center justify-center">
-                        <svg class="animate-spin h-5 w-5 text-blue-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p class="text-sm text-blue-800 font-semibold">
-                            Tentando detectar novamente...
-                        </p>
-                    </div>
-                </div>
-            `;
-            
-            // Try auto-detection again with a small delay
-            setTimeout(() => {
-                const cardDetected = autoDetectCardBorders(tempCanvas);
-                
-                // Update status message
-                if (cardDetected) {
-                    statusDiv.innerHTML = `
-                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-2">
-                            <p class="text-sm text-emerald-800 text-center font-semibold">
-                                ✓ Cartão detectado automaticamente!
-                            </p>
-                            <p class="text-xs text-emerald-700 text-center mt-1">
-                                Ajuste os pontos se necessário ou avance para o próximo passo.
-                            </p>
-                        </div>
-                    `;
-                } else {
-                    statusDiv.innerHTML = `
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
-                            <p class="text-sm text-red-800 text-center font-semibold">
-                                ✗ Não foi possível detectar o cartão
-                            </p>
-                            <p class="text-xs text-red-700 text-center mt-1">
-                                Certifique-se de que o cartão está visível e com boa iluminação.
-                                Use os pontos azuis manualmente.
-                            </p>
-                        </div>
-                    `;
-                }
-                
-                // Reinitialize canvas with new points
-                initCalibrationCanvas();
-            }, 100);
-        }
-
-        function initMeasurementCanvas() {
-            setupCanvas('measurementCanvas', pupilPoints, 'pupil', () => {
-                const dist = Math.abs(pupilPoints[0].x - pupilPoints[1].x);
-                document.getElementById('btnToStep5').disabled = dist < 0.05;
-            });
-        }
-
-        function calculateAndShowResult() {
-            const canvas = document.getElementById('measurementCanvas');
-            const scale = parseFloat(canvas.dataset.scale);
-            
-            const refPx1 = { x: refPoints[0].x * canvas.width, y: refPoints[0].y * canvas.height };
-            const refPx2 = { x: refPoints[1].x * canvas.width, y: refPoints[1].y * canvas.height };
-            
-            const refImgDist = Math.sqrt(
-                ((refPx2.x - refPx1.x) / scale) ** 2 + 
-                ((refPx2.y - refPx1.y) / scale) ** 2
-            );
-
-            const pupilPx1 = { x: pupilPoints[0].x * canvas.width, y: pupilPoints[0].y * canvas.height };
-            const pupilPx2 = { x: pupilPoints[1].x * canvas.width, y: pupilPoints[1].y * canvas.height };
-
-            const pupilImgDist = Math.sqrt(
-                ((pupilPx2.x - pupilPx1.x) / scale) ** 2 + 
-                ((pupilPx2.y - pupilPx1.y) / scale) ** 2
-            );
-
-            // Calculate DP with device calibration factor
-            const rawDP = (pupilImgDist / refImgDist) * STANDARD_CARD_WIDTH_MM;
-            
-            // Apply calibration factor based on device type
-            const calibrationFactor = deviceInfo.calibrationFactor;
-            const calibratedDP = rawDP * calibrationFactor;
-            
-            // Round to nearest 0.5mm (standard optical practice)
-            const roundedDP = Math.round(calibratedDP * 2) / 2;
-            
-            document.getElementById('resultValue').textContent = roundedDP.toFixed(1);
-            
-            const name = document.getElementById('patientName').value.trim() || 'Não informado';
-            const dateRaw = document.getElementById('measurementDate').value;
-            const date = dateRaw ? new Date(dateRaw).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
-            
-            document.getElementById('resultName').textContent = name;
-            document.getElementById('resultDate').textContent = date;
-            
-            // Display device info
-            const deviceType = deviceInfo.isMobile ? 
-                (deviceInfo.isIOS ? 'iOS' : 'Android') : 
-                'Desktop';
-            const screenSize = `${deviceInfo.screenWidth}x${deviceInfo.screenHeight}`;
-            document.getElementById('resultDevice').textContent = 
-                `${deviceType} (${screenSize}, DPR: ${deviceInfo.pixelRatio})`;
-            document.getElementById('resultCalibration').textContent = 
-                `${calibrationFactor.toFixed(2)}x (${deviceInfo.isMobile ? 'mobile' : 'desktop'})`;
-            
-            goToStep(5);
-        }
-
-        function shareWhatsApp() {
-            const name = document.getElementById('patientName').value.trim() || 'Paciente';
-            const dateRaw = document.getElementById('measurementDate').value;
-            const date = dateRaw ? new Date(dateRaw).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
-            const dp = document.getElementById('resultValue').textContent;
-            
-            const message = `*Medição de Distância Pupilar (DP)*\n\n👤 *Paciente:* ${name}\n📅 *Data:* ${date}\n📏 *DP:* ${dp} mm\n\n_Medido com Medidor Óptico By Willian L._`;
-            const encodedMessage = encodeURIComponent(message);
-            window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
-        }
-
-        function resetApp() {
-            stopCamera();
-            image = new Image();
-            refPoints = [{x: 0.3, y: 0.2}, {x: 0.7, y: 0.2}];
-            pupilPoints = [{x: 0.4, y: 0.5}, {x: 0.6, y: 0.5}];
-            document.getElementById('btnToStep4').disabled = true;
-            document.getElementById('btnToStep5').disabled = true;
-            document.getElementById('patientName').value = '';
-            document.getElementById('measurementDate').valueAsDate = new Date();
-            currentCameraMode = 'user'; // Reset to front camera
-            goToStep(1);
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('measurementDate').valueAsDate = new Date();
-            
-            // Display detected device info
-            const deviceType = deviceInfo.isMobile ? 
-                (deviceInfo.isIOS ? 'iOS' : 'Android') : 
-                'Desktop';
-            const screenSize = `${deviceInfo.screenWidth}x${deviceInfo.screenHeight}`;
-            const calibrationInfo = deviceInfo.calibrationFactor !== 1.0 ? 
-                ` (Calibração: ${deviceInfo.calibrationFactor.toFixed(2)}x)` : '';
-            
-            document.getElementById('deviceInfoDisplay').textContent = 
-                `${deviceType} - ${screenSize}${calibrationInfo}`;
-            
-            // Check if running on HTTP (not HTTPS or localhost)
-            const isSecure = window.location.protocol === 'https:' || 
-                           window.location.hostname === 'localhost' || 
-                           window.location.hostname === '127.0.0.1';
-            
-            if (!isSecure) {
-                const warningDiv = document.createElement('div');
-                warningDiv.className = 'bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4';
-                warningDiv.innerHTML = `
-                    <p class="text-xs text-amber-800">
-                        <strong>⚠️ Modo de Compatibilidade:</strong> A câmera ao vivo requer HTTPS. 
-                        Você poderá fazer upload de fotos ou usar a câmera do sistema.
-                    </p>
-                `;
-                const step1Content = document.querySelector('#step1 > div');
-                step1Content.insertBefore(warningDiv, step1Content.lastElementChild);
+                faceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: true, // Enables iris landmarks (468-477)
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+                faceMesh.onResults(onFaceResults);
+                isFaceMeshReady = true;
+                resolve();
+            } catch (err) {
+                console.error('FaceMesh init error:', err);
+                reject(err);
             }
         });
+    }
+
+    function startFaceDetection(video) {
+        if (mpCamera) mpCamera.stop();
+        mpCamera = new Camera(video, {
+            onFrame: async () => {
+                if (faceMesh && isFaceMeshReady) {
+                    await faceMesh.send({ image: video });
+                }
+            },
+            width: 1280,
+            height: 720
+        });
+        mpCamera.start();
+    }
+
+    // ============ FACE ANALYSIS ============
+    function onFaceResults(results) {
+        if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+            latestLandmarks = null;
+            updateUI_NoFace();
+            return;
+        }
+
+        const landmarks = results.multiFaceLandmarks[0];
+        latestLandmarks = landmarks;
+        
+        // Calculate face analysis
+        const analysis = analyzeFace(landmarks);
+        latestConfidence = analysis.confidence;
+        
+        // Draw overlay
+        drawOverlay(landmarks, analysis);
+        
+        // Update UI
+        updateUI_FaceDetected(analysis);
+    }
+
+    function getLandmarkCenter(landmarks, indices) {
+        let x = 0, y = 0, z = 0;
+        for (const idx of indices) {
+            x += landmarks[idx].x;
+            y += landmarks[idx].y;
+            z += landmarks[idx].z;
+        }
+        return { x: x / indices.length, y: y / indices.length, z: z / indices.length };
+    }
+
+    function analyzeFace(landmarks) {
+        // Get key points
+        const leftIris = getLandmarkCenter(landmarks, LANDMARKS.LEFT_IRIS);
+        const rightIris = getLandmarkCenter(landmarks, LANDMARKS.RIGHT_IRIS);
+        const noseTip = landmarks[LANDMARKS.NOSE_TIP];
+        const faceLeft = landmarks[LANDMARKS.FACE_LEFT];
+        const faceRight = landmarks[LANDMARKS.FACE_RIGHT];
+        const chin = landmarks[LANDMARKS.CHIN];
+        const forehead = landmarks[LANDMARKS.FOREHEAD];
+        
+        // Calculate pixel distances (normalized 0-1)
+        const ipdPixels = Math.sqrt(
+            (leftIris.x - rightIris.x) ** 2 + 
+            (leftIris.y - rightIris.y) ** 2
+        );
+        
+        const faceWidthPixels = Math.sqrt(
+            (faceLeft.x - faceRight.x) ** 2 + 
+            (faceLeft.y - faceRight.y) ** 2
+        );
+        
+        const faceHeightPixels = Math.sqrt(
+            (forehead.x - chin.x) ** 2 + 
+            (forehead.y - chin.y) ** 2
+        );
+        
+        // Estimate scale using average face width
+        // If no ArUco calibration, use anthropometric average
+        let mmPerPixel;
+        if (calibrationMode && calibrationScale !== 1.0) {
+            mmPerPixel = calibrationScale;
+        } else {
+            mmPerPixel = AVG_FACE_WIDTH / faceWidthPixels;
+        }
+        
+        // Calculate measurements in mm
+        const dpTotal = ipdPixels * mmPerPixel;
+        
+        // Monocular DP (distance from face center to each iris)
+        // Face center is the midpoint between the two pupils
+        const faceCenterPupil = {
+            x: (leftIris.x + rightIris.x) / 2,
+            y: (leftIris.y + rightIris.y) / 2
+        };
+        
+        const dpOD = Math.sqrt(
+            (faceCenterPupil.x - rightIris.x) ** 2 + 
+            (faceCenterPupil.y - rightIris.y) ** 2
+        ) * mmPerPixel;
+        
+        const dpOE = Math.sqrt(
+            (faceCenterPupil.x - leftIris.x) ** 2 + 
+            (faceCenterPupil.y - leftIris.y) ** 2
+        ) * mmPerPixel;
+        
+        // Pupillary height (distance from eye center to nose bottom reference)
+        const noseBottom = landmarks[LANDMARKS.NOSE_BOTTOM];
+        const leftEyeCenter = {
+            x: (landmarks[LANDMARKS.LEFT_EYE_TOP].x + landmarks[LANDMARKS.LEFT_EYE_BOTTOM].x) / 2,
+            y: (landmarks[LANDMARKS.LEFT_EYE_TOP].y + landmarks[LANDMARKS.LEFT_EYE_BOTTOM].y) / 2
+        };
+        const rightEyeCenter = {
+            x: (landmarks[LANDMARKS.RIGHT_EYE_TOP].x + landmarks[LANDMARKS.RIGHT_EYE_BOTTOM].x) / 2,
+            y: (landmarks[LANDMARKS.RIGHT_EYE_TOP].y + landmarks[LANDMARKS.RIGHT_EYE_BOTTOM].y) / 2
+        };
+        
+        const heightOD = Math.abs(leftEyeCenter.y - noseBottom.y) * mmPerPixel;
+        const heightOE = Math.abs(rightEyeCenter.y - noseBottom.y) * mmPerPixel;
+        
+        // Head tilt (angle between eye line and horizontal)
+        const eyeAngle = Math.atan2(
+            leftIris.y - rightIris.y,
+            leftIris.x - rightIris.x
+        ) * (180 / Math.PI);
+        const headTilt = Math.abs(eyeAngle);
+        
+        // Confidence calculation
+        let confidence = 0;
+        
+        // Face must be roughly centered
+        const faceCenterX = (faceLeft.x + faceRight.x) / 2;
+        const faceCenterY = (forehead.y + chin.y) / 2;
+        const centerPenalty = Math.sqrt((faceCenterX - 0.5) ** 2 + (faceCenterY - 0.5) ** 2);
+        confidence += Math.max(0, 30 - centerPenalty * 100);
+        
+        // Face should not be too tilted
+        confidence += Math.max(0, 25 - headTilt * 2);
+        
+        // IPD should be in reasonable range (50-80mm)
+        if (dpTotal >= 50 && dpTotal <= 80) confidence += 25;
+        else if (dpTotal >= 45 && dpTotal <= 85) confidence += 15;
+        else confidence += 5;
+        
+        // Face should occupy reasonable portion of frame
+        if (faceWidthPixels > 0.25 && faceWidthPixels < 0.8) confidence += 20;
+        else confidence += 5;
+        
+        confidence = Math.min(100, Math.round(confidence));
+        
+        return {
+            dpTotal: Math.round(dpTotal * 2) / 2,
+            dpOD: Math.round(dpOD * 2) / 2,
+            dpOE: Math.round(dpOE * 2) / 2,
+            heightOD: Math.round(heightOD * 10) / 10,
+            heightOE: Math.round(heightOE * 10) / 10,
+            headTilt: Math.round(headTilt * 10) / 10,
+            confidence,
+            leftIris, rightIris, noseTip,
+            faceLeft, faceRight, chin, forehead,
+            leftEyeCenter, rightEyeCenter, noseBottom,
+            faceWidthPixels, faceHeightPixels,
+            mmPerPixel
+        };
+    }
+
+    function drawOverlay(landmarks, analysis) {
+        const canvas = document.getElementById('overlayCanvas');
+        const video = document.getElementById('videoElement');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        
+        const w = canvas.width;
+        const h = canvas.height;
+        
+        ctx.clearRect(0, 0, w, h);
+        
+        // Draw face oval
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+        ctx.lineWidth = 2;
+        const faceOval = LANDMARKS.FACE_OVAL;
+        for (let i = 0; i < faceOval.length; i++) {
+            const lm = landmarks[faceOval[i]];
+            const x = lm.x * w;
+            const y = lm.y * h;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Draw iris points
+        const drawIris = (indices, color) => {
+            const center = getLandmarkCenter(landmarks, indices);
+            const cx = center.x * w;
+            const cy = center.y * h;
+            
+            // Draw iris circle
+            let radius = 0;
+            for (const idx of indices) {
+                const dx = landmarks[idx].x * w - cx;
+                const dy = landmarks[idx].y * h - cy;
+                radius = Math.max(radius, Math.sqrt(dx*dx + dy*dy));
+            }
+            
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = color.replace('0.8', '0.2');
+            ctx.fill();
+            
+            // Center dot
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+        };
+        
+        drawIris(LANDMARKS.LEFT_IRIS, 'rgba(16, 185, 129, 0.8)');
+        drawIris(LANDMARKS.RIGHT_IRIS, 'rgba(16, 185, 129, 0.8)');
+        
+        // Draw nose tip
+        const nose = landmarks[LANDMARKS.NOSE_TIP];
+        ctx.beginPath();
+        ctx.arc(nose.x * w, nose.y * h, 5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.8)';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        
+        // Draw DP line between irises
+        const li = analysis.leftIris;
+        const ri = analysis.rightIris;
+        ctx.beginPath();
+        ctx.moveTo(li.x * w, li.y * h);
+        ctx.lineTo(ri.x * w, ri.y * h);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Draw DP value at midpoint
+        const midX = ((li.x + ri.x) / 2) * w;
+        const midY = ((li.y + ri.y) / 2) * h - 20;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.roundRect(midX - 40, midY - 12, 80, 24, 6);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${analysis.dpTotal} mm`, midX, midY + 5);
+        
+        // Draw monocular lines (face center to each iris)
+        const faceCenter = {
+            x: ((analysis.leftIris.x + analysis.rightIris.x) / 2) * w,
+            y: ((analysis.leftIris.y + analysis.rightIris.y) / 2) * h
+        };
+        
+        // Draw center point
+        ctx.beginPath();
+        ctx.arc(faceCenter.x, faceCenter.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(139, 92, 246, 0.8)';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(faceCenter.x, faceCenter.y);
+        ctx.lineTo(analysis.leftIris.x * w, analysis.leftIris.y * h);
+        ctx.moveTo(faceCenter.x, faceCenter.y);
+        ctx.lineTo(analysis.rightIris.x * w, analysis.rightIris.y * h);
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // ============ UI UPDATES ============
+    function updateUI_NoFace() {
+        const status = document.getElementById('faceStatus');
+        const conf = document.getElementById('confidenceValue');
+        const fill = document.getElementById('confidenceFill');
+        const info = document.getElementById('landmarkInfo');
+        const btn = document.getElementById('captureBtn');
+        
+        status.textContent = 'Nenhum rosto detectado';
+        status.className = 'text-sm font-bold text-amber-400';
+        conf.textContent = '0%';
+        fill.style.width = '0%';
+        fill.style.background = '#ef4444';
+        info.textContent = 'Posicione o rosto centralizado na câmera';
+        btn.disabled = true;
+    }
+
+    function updateUI_FaceDetected(analysis) {
+        const status = document.getElementById('faceStatus');
+        const conf = document.getElementById('confidenceValue');
+        const fill = document.getElementById('confidenceFill');
+        const info = document.getElementById('landmarkInfo');
+        const btn = document.getElementById('captureBtn');
+        
+        conf.textContent = `${analysis.confidence}%`;
+        fill.style.width = `${analysis.confidence}%`;
+        
+        if (analysis.confidence >= 70) {
+            status.textContent = '✓ Rosto detectado';
+            status.className = 'text-sm font-bold text-emerald-400';
+            fill.style.background = '#10b981';
+            btn.disabled = false;
+        } else if (analysis.confidence >= 40) {
+            status.textContent = '⚠ Ajuste a posição';
+            status.className = 'text-sm font-bold text-amber-400';
+            fill.style.background = '#f59e0b';
+            btn.disabled = true;
+        } else {
+            status.textContent = '✗ Posição incorreta';
+            status.className = 'text-sm font-bold text-red-400';
+            fill.style.background = '#ef4444';
+            btn.disabled = true;
+        }
+        
+        info.textContent = `DP: ${analysis.dpTotal}mm | Inclinação: ${analysis.headTilt}° | OD: ${analysis.dpOD}mm | OE: ${analysis.dpOE}mm`;
+    }
+
+    // ============ CAPTURE & MEASUREMENT ============
+    function captureMeasurement() {
+        if (!latestLandmarks || !latestConfidence) return;
+        
+        const analysis = analyzeFace(latestLandmarks);
+        capturedMeasurements = analysis;
+        
+        stopCamera();
+        showValidation(analysis);
+    }
+
+    function showValidation(analysis) {
+        document.getElementById('dpTotal').textContent = analysis.dpTotal.toFixed(1);
+        document.getElementById('dpOD').textContent = analysis.dpOD.toFixed(1);
+        document.getElementById('dpOE').textContent = analysis.dpOE.toFixed(1);
+        document.getElementById('heightOD').textContent = analysis.heightOD.toFixed(1);
+        document.getElementById('heightOE').textContent = analysis.heightOE.toFixed(1);
+        document.getElementById('headTilt').textContent = analysis.headTilt.toFixed(1);
+        document.getElementById('confidenceLevel').textContent = analysis.confidence;
+        
+        const alert = document.getElementById('validationAlert');
+        if (analysis.confidence >= 70 && analysis.dpTotal >= 50 && analysis.dpTotal <= 80) {
+            alert.className = 'bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4';
+            alert.innerHTML = '<p class="text-sm text-emerald-800 font-semibold text-center">✓ Medição válida para uso</p>';
+        } else if (analysis.confidence >= 40) {
+            alert.className = 'bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4';
+            alert.innerHTML = '<p class="text-sm text-amber-800 font-semibold text-center">⚠ Confiança moderada - considere recapturar</p>';
+        } else {
+            alert.className = 'bg-red-50 border border-red-200 rounded-lg p-3 mb-4';
+            alert.innerHTML = '<p class="text-sm text-red-800 font-semibold text-center">✗ Confiança baixa - recapture para melhor precisão</p>';
+        }
+        
+        goToStep(4);
+    }
+
+    function showResults() {
+        if (!capturedMeasurements) return;
+        const m = capturedMeasurements;
+        
+        const name = document.getElementById('patientName').value.trim() || 'Não informado';
+        const dateRaw = document.getElementById('measurementDate').value;
+        const date = dateRaw ? new Date(dateRaw).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+        
+        document.getElementById('resultName').textContent = name;
+        document.getElementById('resultDate').textContent = date;
+        document.getElementById('resultDPTotal').textContent = `${m.dpTotal.toFixed(1)} mm`;
+        document.getElementById('resultConfidence').textContent = `${m.confidence}%`;
+        document.getElementById('resultDPMono').textContent = `${m.dpOD.toFixed(1)} / ${m.dpOE.toFixed(1)} mm`;
+        document.getElementById('resultHeight').textContent = `${m.heightOD.toFixed(1)} / ${m.heightOE.toFixed(1)} mm`;
+        
+        goToStep(5);
+    }
+
+    // ============ ARUCO CALIBRATION ============
+    function toggleCalibrationMode() {
+        calibrationMode = !calibrationMode;
+        const btn = document.getElementById('calibrationToggle');
+        if (calibrationMode) {
+            btn.textContent = '✅ Calibração Ativa';
+            btn.classList.add('bg-emerald-500');
+            goToStep(3);
+            initCalibrationCanvas();
+        } else {
+            btn.textContent = '🎯 Calibrar com Marcador';
+            btn.classList.remove('bg-emerald-500');
+            calibrationScale = 1.0;
+        }
+    }
+
+    let calibPoints = [{x: 0.3, y: 0.4}, {x: 0.7, y: 0.4}];
+    let activeCalibPoint = -1;
+
+    function initCalibrationCanvas() {
+        const canvas = document.getElementById('calibrationCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = canvas.parentElement;
+        
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 30) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 30) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+            
+            // Draw instruction
+            ctx.fillStyle = 'white';
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Arraste os pontos para as bordas do marcador', canvas.width/2, 30);
+            
+            // Draw marker width indicator
+            const markerMM = parseFloat(document.getElementById('markerWidth').value) || 30;
+            const dist = Math.abs(calibPoints[0].x - calibPoints[1].x) * canvas.width;
+            const pxPerMM = dist / markerMM;
+            
+            ctx.fillStyle = '#10b981';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText(`${markerMM}mm = ${Math.round(dist)}px (${pxPerMM.toFixed(2)} px/mm)`, canvas.width/2, canvas.height - 20);
+            
+            // Draw points
+            calibPoints.forEach((p, i) => {
+                const px = p.x * canvas.width;
+                const py = p.y * canvas.height;
+                ctx.beginPath();
+                ctx.arc(px, py, 14, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
+                ctx.fill();
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(px - 18, py); ctx.lineTo(px + 18, py);
+                ctx.moveTo(px, py - 18); ctx.lineTo(px, py + 18);
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+            
+            // Draw line between points
+            ctx.beginPath();
+            ctx.moveTo(calibPoints[0].x * canvas.width, calibPoints[0].y * canvas.height);
+            ctx.lineTo(calibPoints[1].x * canvas.width, calibPoints[1].y * canvas.height);
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+        
+        function findPoint(pos) {
+            for (let i = 0; i < calibPoints.length; i++) {
+                const px = calibPoints[i].x * canvas.width;
+                const py = calibPoints[i].y * canvas.height;
+                if (Math.sqrt((pos.x - px)**2 + (pos.y - py)**2) < 30) return i;
+            }
+            return -1;
+        }
+        
+        canvas.onmousedown = canvas.ontouchstart = (e) => {
+            e.preventDefault();
+            activeCalibPoint = findPoint(getPos(e));
+        };
+        canvas.onmousemove = canvas.ontouchmove = (e) => {
+            e.preventDefault();
+            if (activeCalibPoint === -1) return;
+            const pos = getPos(e);
+            calibPoints[activeCalibPoint].x = Math.max(0, Math.min(1, pos.x / canvas.width));
+            calibPoints[activeCalibPoint].y = Math.max(0, Math.min(1, (pos.y - 60) / canvas.height));
+            draw();
+            const dist = Math.abs(calibPoints[0].x - calibPoints[1].x);
+            document.getElementById('btnCalibrationDone').disabled = dist < 0.1;
+        };
+        canvas.onmouseup = canvas.ontouchend = () => { activeCalibPoint = -1; };
+        
+        draw();
+    }
+
+    function finishCalibration() {
+        const markerMM = parseFloat(document.getElementById('markerWidth').value) || 30;
+        const canvas = document.getElementById('calibrationCanvas');
+        const dist = Math.abs(calibPoints[0].x - calibPoints[1].x) * canvas.width;
+        calibrationScale = markerMM / dist;
+        calibrationMode = true;
+        
+        const btn = document.getElementById('calibrationToggle');
+        btn.textContent = `✅ Calibrado (${calibrationScale.toFixed(3)} mm/px)`;
+        
+        goToStep(2);
+        
+        // Restart camera if needed
+        if (!videoStream) {
+            startCamera();
+        }
+    }
+
+    // ============ FRAME MEASUREMENT (ALTURA PUPILAR COM ARMAÇÃO) - AUTOMÁTICO ============
+    let frameVideoStream = null;
+    let frameVideoElement = null;
+    let frameFaceMesh = null;
+    let frameCamera = null;
+    let frameMeasurements = null;
+    let frameDetectionData = null;
+
+    // MediaPipe landmarks para contorno dos olhos (usados para detectar bordas da armação)
+    const FRAME_LANDMARKS = {
+        LEFT_EYE_TOP: [159, 145, 153, 154],      // Pálpebra superior
+        LEFT_EYE_BOTTOM: [145, 153, 144, 154],    // Pálpebra inferior
+        RIGHT_EYE_TOP: [386, 374, 380, 381],      // Pálpebra superior
+        RIGHT_EYE_BOTTOM: [374, 380, 373, 381],   // Pálpebra inferior
+        LEFT_IRIS: [468, 469, 470, 471, 472],
+        RIGHT_IRIS: [473, 474, 475, 476, 477],
+        // Pontos acima e abaixo dos olhos para estimar bordas da armação
+        LEFT_BROW: [70, 63, 105, 66, 107],
+        RIGHT_BROW: [300, 293, 334, 296, 336],
+        LEFT_CHEEK: [116, 117, 118, 119, 120],
+        RIGHT_CHEEK: [345, 346, 347, 348, 349]
+    };
+
+    async function startFrameCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Seu navegador não suporta acesso à câmera.');
+            return;
+        }
+        try {
+            // Initialize Face Mesh for frame detection
+            await initFrameFaceMesh();
+            
+            const constraints = {
+                video: {
+                    facingMode: 'user',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            };
+            frameVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
+            frameVideoElement = document.getElementById('frameVideoElement');
+            frameVideoElement.srcObject = frameVideoStream;
+            frameVideoElement.classList.add('mirror');
+            
+            frameVideoElement.onloadedmetadata = () => {
+                startFrameFaceDetection(frameVideoElement);
+            };
+            if (frameVideoElement.readyState >= 2) startFrameFaceDetection(frameVideoElement);
+            
+        } catch (err) {
+            console.error('Frame camera error:', err);
+            alert('Não foi possível acessar a câmera.');
+        }
+    }
+
+    async function initFrameFaceMesh() {
+        if (frameFaceMesh) return;
+        
+        return new Promise((resolve, reject) => {
+            try {
+                frameFaceMesh = new FaceMesh({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+                });
+                frameFaceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+                frameFaceMesh.onResults(onFrameFaceResults);
+                resolve();
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    function startFrameFaceDetection(video) {
+        if (frameCamera) frameCamera.stop();
+        frameCamera = new Camera(video, {
+            onFrame: async () => {
+                if (frameFaceMesh) {
+                    await frameFaceMesh.send({ image: video });
+                }
+            },
+            width: 1280,
+            height: 720
+        });
+        frameCamera.start();
+    }
+
+    function onFrameFaceResults(results) {
+        if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+            frameDetectionData = null;
+            updateFrameUI_NoFace();
+            return;
+        }
+
+        const landmarks = results.multiFaceLandmarks[0];
+        const analysis = analyzeFrameWithFace(landmarks);
+        frameDetectionData = analysis;
+        
+        drawFrameOverlay(landmarks, analysis);
+        updateFrameUI_FaceDetected(analysis);
+    }
+
+    function analyzeFrameWithFace(landmarks) {
+        // Get iris centers (pupils)
+        const leftIris = getLandmarkCenter(landmarks, FRAME_LANDMARKS.LEFT_IRIS);
+        const rightIris = getLandmarkCenter(landmarks, FRAME_LANDMARKS.RIGHT_IRIS);
+        
+        // Get eye corners to estimate frame width
+        const leftEyeOuter = landmarks[33];   // Canto externo do olho esquerdo
+        const leftEyeInner = landmarks[133];  // Canto interno do olho esquerdo
+        const rightEyeOuter = landmarks[362]; // Canto externo do olho direito
+        const rightEyeInner = landmarks[263]; // Canto interno do olho direito
+        
+        // Calculate eye width in pixels (normalized coordinates)
+        const leftEyeWidthPx = Math.abs(leftEyeOuter.x - leftEyeInner.x);
+        const rightEyeWidthPx = Math.abs(rightEyeOuter.x - rightEyeInner.x);
+        
+        // Get frame width from user input
+        const frameWidthOD = parseFloat(document.getElementById('frameWidthOD').value) || 52;
+        const frameWidthOE = parseFloat(document.getElementById('frameWidthOE').value) || 52;
+        
+        // Estimate frame width in pixels (typically 1.3-1.5x eye width)
+        const frameMultiplier = 1.4;
+        const frameWidthODPx = rightEyeWidthPx * frameMultiplier;
+        const frameWidthOEPx = leftEyeWidthPx * frameMultiplier;
+        
+        // Calculate scale (mm per pixel) for each eye
+        const mmPerPixelOD = frameWidthOD / frameWidthODPx;
+        const mmPerPixelOE = frameWidthOE / frameWidthOEPx;
+        
+        // Estimate frame height (vertical) based on typical lens proportions
+        // Typical lens height is about 70-80% of lens width
+        const heightRatio = 0.75;
+        const frameHeightODPx = frameWidthODPx * heightRatio;
+        const frameHeightOEPx = frameWidthOEPx * heightRatio;
+        
+        // Calculate frame borders (centered on eye)
+        // Right eye (OD)
+        const rightEyeCenter = {
+            x: rightIris.x,
+            y: rightIris.y
+        };
+        const rightTopBorder = {
+            x: rightEyeCenter.x,
+            y: rightEyeCenter.y - (frameHeightODPx / 2)
+        };
+        const rightBottomBorder = {
+            x: rightEyeCenter.x,
+            y: rightEyeCenter.y + (frameHeightODPx / 2)
+        };
+        
+        // Left eye (OE)
+        const leftEyeCenter = {
+            x: leftIris.x,
+            y: leftIris.y
+        };
+        const leftTopBorder = {
+            x: leftEyeCenter.x,
+            y: leftEyeCenter.y - (frameHeightOEPx / 2)
+        };
+        const leftBottomBorder = {
+            x: leftEyeCenter.x,
+            y: leftEyeCenter.y + (frameHeightOEPx / 2)
+        };
+        
+        // ALTURA PUPILAR: Distância do CENTRO DA PUPILA até a BORDA INFERIOR da armação
+        // Calculate in pixels first
+        const rightPupilToBottomPx = (rightBottomBorder.y - rightIris.y);
+        const leftPupilToBottomPx = (leftBottomBorder.y - leftIris.y);
+        
+        // Convert to mm using respective scales
+        const heightOD = rightPupilToBottomPx * mmPerPixelOD;
+        const heightOE = leftPupilToBottomPx * mmPerPixelOE;
+        
+        // Calculate top distance (pupil to top border)
+        const rightPupilToTopPx = (rightIris.y - rightTopBorder.y);
+        const leftPupilToTopPx = (leftIris.y - leftTopBorder.y);
+        const topOD = rightPupilToTopPx * mmPerPixelOD;
+        const topOE = leftPupilToTopPx * mmPerPixelOE;
+        
+        // Calculate total lens height
+        const lensHeightOD = frameHeightODPx * mmPerPixelOD;
+        const lensHeightOE = frameHeightOEPx * mmPerPixelOE;
+        
+        // Confidence calculation
+        let confidence = 0;
+        
+        // Face must be reasonably centered
+        const faceLeft = landmarks[234];
+        const faceRight = landmarks[454];
+        const faceCenterX = (faceLeft.x + faceRight.x) / 2;
+        const centerPenalty = Math.abs(faceCenterX - 0.5);
+        confidence += Math.max(0, 30 - centerPenalty * 100);
+        
+        // Eyes should be visible and pupils detected
+        confidence += 25;
+        
+        // Frame width values should be reasonable (40-60mm typical)
+        if (frameWidthOD >= 40 && frameWidthOD <= 65 && frameWidthOE >= 40 && frameWidthOE <= 65) {
+            confidence += 20;
+        } else {
+            confidence += 10;
+        }
+        
+        // Height should be reasonable (10-30mm typical for pupillary height)
+        if (heightOD > 10 && heightOD < 30 && heightOE > 10 && heightOE < 30) {
+            confidence += 25;
+        } else if (heightOD > 5 && heightOD < 35 && heightOE > 5 && heightOE < 35) {
+            confidence += 15;
+        } else {
+            confidence += 5;
+        }
+        
+        confidence = Math.min(100, Math.round(confidence));
+        
+        return {
+            // ALTURA PUPILAR CORRETA: centro da pupila até borda inferior
+            heightOD: Math.round(heightOD * 10) / 10,
+            heightOE: Math.round(heightOE * 10) / 10,
+            // Outras medidas
+            topOD: Math.round(topOD * 10) / 10,
+            topOE: Math.round(topOE * 10) / 10,
+            lensHeightOD: Math.round(lensHeightOD * 10) / 10,
+            lensHeightOE: Math.round(lensHeightOE * 10) / 10,
+            // Frame dimensions
+            frameWidthOD: frameWidthOD,
+            frameWidthOE: frameWidthOE,
+            // Scales
+            mmPerPixelOD: mmPerPixelOD,
+            mmPerPixelOE: mmPerPixelOE,
+            confidence,
+            leftIris, rightIris,
+            leftTopBorder, rightTopBorder,
+            leftBottomBorder, rightBottomBorder,
+            leftEyeCenter, rightEyeCenter
+        };
+    }
+
+    function drawFrameOverlay(landmarks, analysis) {
+        const canvas = document.getElementById('frameOverlayCanvas');
+        const video = document.getElementById('frameVideoElement');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        
+        const w = canvas.width;
+        const h = canvas.height;
+        
+        ctx.clearRect(0, 0, w, h);
+        
+        // Draw frame borders (estimated based on user input)
+        // Right lens (OD) - Top border (red)
+        ctx.beginPath();
+        ctx.moveTo(analysis.rightTopBorder.x * w - 40, analysis.rightTopBorder.y * h);
+        ctx.lineTo(analysis.rightTopBorder.x * w + 40, analysis.rightTopBorder.y * h);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Right lens (OD) - Bottom border (green)
+        ctx.beginPath();
+        ctx.moveTo(analysis.rightBottomBorder.x * w - 40, analysis.rightBottomBorder.y * h);
+        ctx.lineTo(analysis.rightBottomBorder.x * w + 40, analysis.rightBottomBorder.y * h);
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Left lens (OE) - Top border (red)
+        ctx.beginPath();
+        ctx.moveTo(analysis.leftTopBorder.x * w - 40, analysis.leftTopBorder.y * h);
+        ctx.lineTo(analysis.leftTopBorder.x * w + 40, analysis.leftTopBorder.y * h);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Left lens (OE) - Bottom border (green)
+        ctx.beginPath();
+        ctx.moveTo(analysis.leftBottomBorder.x * w - 40, analysis.leftBottomBorder.y * h);
+        ctx.lineTo(analysis.leftBottomBorder.x * w + 40, analysis.leftBottomBorder.y * h);
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Draw measurement lines: PUPIL to BOTTOM BORDER (altura pupilar)
+        // Right eye (OD) - Green solid line
+        ctx.beginPath();
+        ctx.moveTo(analysis.rightIris.x * w, analysis.rightIris.y * h);
+        ctx.lineTo(analysis.rightIris.x * w, analysis.rightBottomBorder.y * h);
+        ctx.strokeStyle = 'rgba(16, 185, 129, 1)';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([]);
+        ctx.stroke();
+        
+        // Left eye (OE) - Green solid line
+        ctx.beginPath();
+        ctx.moveTo(analysis.leftIris.x * w, analysis.leftIris.y * h);
+        ctx.lineTo(analysis.leftIris.x * w, analysis.leftBottomBorder.y * h);
+        ctx.strokeStyle = 'rgba(16, 185, 129, 1)';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([]);
+        ctx.stroke();
+        
+        // Draw reference line from pupil to top (for visualization)
+        // Right eye (OD) - Red dashed line
+        ctx.beginPath();
+        ctx.moveTo(analysis.rightIris.x * w, analysis.rightIris.y * h);
+        ctx.lineTo(analysis.rightIris.x * w, analysis.rightTopBorder.y * h);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Left eye (OE) - Red dashed line
+        ctx.beginPath();
+        ctx.moveTo(analysis.leftIris.x * w, analysis.leftIris.y * h);
+        ctx.lineTo(analysis.leftIris.x * w, analysis.leftTopBorder.y * h);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Draw iris points (pupils)
+        const drawIris = (iris, color) => {
+            const cx = iris.x * w;
+            const cy = iris.y * h;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        };
+        
+        drawIris(analysis.leftIris, 'rgba(59, 130, 246, 0.9)');
+        drawIris(analysis.rightIris, 'rgba(59, 130, 246, 0.9)');
+        
+        // Draw measurement values - ALTURA PUPILAR (pupila até borda inferior)
+        // Right eye (OD)
+        const rightMidY = (analysis.rightIris.y + analysis.rightBottomBorder.y) / 2 * h;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.roundRect(analysis.rightIris.x * w - 60, rightMidY - 16, 120, 32, 8);
+        ctx.fill();
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`OD: ${analysis.heightOD.toFixed(1)}mm`, analysis.rightIris.x * w, rightMidY + 5);
+        
+        // Left eye (OE)
+        const leftMidY = (analysis.leftIris.y + analysis.leftBottomBorder.y) / 2 * h;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.roundRect(analysis.leftIris.x * w - 60, leftMidY - 16, 120, 32, 8);
+        ctx.fill();
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`OE: ${analysis.heightOE.toFixed(1)}mm`, analysis.leftIris.x * w, leftMidY + 5);
+        
+        // Draw frame width indicators
+        // Right eye (OD) - horizontal line showing frame width
+        const rightFrameLeft = analysis.rightEyeCenter.x * w - (analysis.frameWidthOD / analysis.mmPerPixelOD / 2 * w);
+        const rightFrameRight = analysis.rightEyeCenter.x * w + (analysis.frameWidthOD / analysis.mmPerPixelOD / 2 * w);
+        const rightFrameY = analysis.rightTopBorder.y * h - 15;
+        
+        ctx.beginPath();
+        ctx.moveTo(rightFrameLeft, rightFrameY);
+        ctx.lineTo(rightFrameRight, rightFrameY);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Left eye (OE) - horizontal line showing frame width
+        const leftFrameLeft = analysis.leftEyeCenter.x * w - (analysis.frameWidthOE / analysis.mmPerPixelOE / 2 * w);
+        const leftFrameRight = analysis.leftEyeCenter.x * w + (analysis.frameWidthOE / analysis.mmPerPixelOE / 2 * w);
+        const leftFrameY = analysis.leftTopBorder.y * h - 15;
+        
+        ctx.beginPath();
+        ctx.moveTo(leftFrameLeft, leftFrameY);
+        ctx.lineTo(leftFrameRight, leftFrameY);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    function updateFrameUI_NoFace() {
+        const status = document.getElementById('frameStatus');
+        const conf = document.getElementById('frameConfidenceValue');
+        const fill = document.getElementById('frameConfidenceFill');
+        const info = document.getElementById('frameMeasureInfo');
+        const btn = document.getElementById('frameCaptureBtn');
+        
+        status.textContent = 'Nenhum rosto detectado';
+        status.className = 'text-sm font-bold text-amber-400';
+        conf.textContent = '0%';
+        fill.style.width = '0%';
+        fill.style.background = '#ef4444';
+        info.textContent = 'Vista com a armação e posicione o rosto na câmera';
+        btn.disabled = true;
+    }
+
+    function updateFrameUI_FaceDetected(analysis) {
+        const status = document.getElementById('frameStatus');
+        const conf = document.getElementById('frameConfidenceValue');
+        const fill = document.getElementById('frameConfidenceFill');
+        const info = document.getElementById('frameMeasureInfo');
+        const btn = document.getElementById('frameCaptureBtn');
+        
+        conf.textContent = `${analysis.confidence}%`;
+        fill.style.width = `${analysis.confidence}%`;
+        
+        if (analysis.confidence >= 70) {
+            status.textContent = '✓ Medição precisa';
+            status.className = 'text-sm font-bold text-emerald-400';
+            fill.style.background = '#10b981';
+            btn.disabled = false;
+        } else if (analysis.confidence >= 40) {
+            status.textContent = '⚠ Ajuste a posição';
+            status.className = 'text-sm font-bold text-amber-400';
+            fill.style.background = '#f59e0b';
+            btn.disabled = true;
+        } else {
+            status.textContent = '✗ Posição incorreta';
+            status.className = 'text-sm font-bold text-red-400';
+            fill.style.background = '#ef4444';
+            btn.disabled = true;
+        }
+        
+        info.textContent = `Aro OD: ${analysis.frameWidthOD}mm | Aro OE: ${analysis.frameWidthOE}mm | Altura OD: ${analysis.heightOD.toFixed(1)}mm | Altura OE: ${analysis.heightOE.toFixed(1)}mm`;
+    }
+
+    function captureFrameMeasurement() {
+        if (!frameDetectionData) return;
+        
+        frameMeasurements = {
+            heightOD: frameDetectionData.heightOD,
+            heightOE: frameDetectionData.heightOE,
+            topOD: frameDetectionData.topOD,
+            topOE: frameDetectionData.topOE,
+            lensHeightOD: frameDetectionData.lensHeightOD,
+            lensHeightOE: frameDetectionData.lensHeightOE,
+            frameWidthOD: frameDetectionData.frameWidthOD,
+            frameWidthOE: frameDetectionData.frameWidthOE,
+            confidence: frameDetectionData.confidence
+        };
+        
+        stopFrameCamera();
+        
+        // Display results
+        document.getElementById('frameHeightOD').textContent = frameMeasurements.heightOD.toFixed(1);
+        document.getElementById('frameHeightOE').textContent = frameMeasurements.heightOE.toFixed(1);
+        document.getElementById('frameTopOD').textContent = frameMeasurements.topOD.toFixed(1);
+        document.getElementById('frameTopOE').textContent = frameMeasurements.topOE.toFixed(1);
+        
+        goToStep(6);
+    }
+
+    function stopFrameCamera() {
+        if (frameCamera) { frameCamera.stop(); frameCamera = null; }
+        if (frameVideoStream) { frameVideoStream.getTracks().forEach(t => t.stop()); frameVideoStream = null; }
+    }
+
+    // Override goToStep to start/stop frame camera
+    const originalGoToStep = goToStep;
+    goToStep = function(step) {
+        originalGoToStep(step);
+        if (step === 5) {
+            setTimeout(() => startFrameCamera(), 100);
+        } else if (step !== 5) {
+            stopFrameCamera();
+        }
+    };
+
+    function showFinalResults() {
+        if (!capturedMeasurements) return;
+        const m = capturedMeasurements;
+        
+        const name = document.getElementById('patientName').value.trim() || 'Não informado';
+        const dateRaw = document.getElementById('measurementDate').value;
+        const date = dateRaw ? new Date(dateRaw).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+        
+        document.getElementById('resultName').textContent = name;
+        document.getElementById('resultDate').textContent = date;
+        document.getElementById('resultDPTotal').textContent = `${m.dpTotal.toFixed(1)} mm`;
+        document.getElementById('resultConfidence').textContent = `${m.confidence}%`;
+        document.getElementById('resultDPMono').textContent = `${m.dpOD.toFixed(1)} / ${m.dpOE.toFixed(1)} mm`;
+        document.getElementById('resultHeight').textContent = `${m.heightOD.toFixed(1)} / ${m.heightOE.toFixed(1)} mm`;
+        
+        // Show frame measurements if available
+        if (frameMeasurements) {
+            document.getElementById('frameResultsSection').classList.remove('hidden');
+            document.getElementById('resultFrameWidthOD').textContent = `${frameMeasurements.frameWidthOD} mm`;
+            document.getElementById('resultFrameWidthOE').textContent = `${frameMeasurements.frameWidthOE} mm`;
+            document.getElementById('resultFrameHeight').textContent = 
+                `${frameMeasurements.heightOD.toFixed(1)} / ${frameMeasurements.heightOE.toFixed(1)} mm`;
+            document.getElementById('resultFrameTop').textContent = 
+                `${frameMeasurements.topOD.toFixed(1)} / ${frameMeasurements.topOE.toFixed(1)} mm`;
+        } else {
+            document.getElementById('frameResultsSection').classList.add('hidden');
+        }
+        
+        goToStep(7);
+    }
+
+    // ============ SHARING ============
+    function shareWhatsApp() {
+        if (!capturedMeasurements) return;
+        const m = capturedMeasurements;
+        const name = document.getElementById('patientName').value.trim() || 'Paciente';
+        const dateRaw = document.getElementById('measurementDate').value;
+        const date = dateRaw ? new Date(dateRaw).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+        
+        let message = `*Medição Óptica - Medidor By Willian L.*\n\n` +
+            `👤 *Paciente:* ${name}\n` +
+            `📅 *Data:* ${date}\n\n` +
+            `📏 *DP Total:* ${m.dpTotal.toFixed(1)} mm\n` +
+            `👁 *DP OD:* ${m.dpOD.toFixed(1)} mm\n` +
+            `👁 *DP OE:* ${m.dpOE.toFixed(1)} mm\n` +
+            `📐 *Altura OD:* ${m.heightOD.toFixed(1)} mm\n` +
+            `📐 *Altura OE:* ${m.heightOE.toFixed(1)} mm\n` +
+            `🔄 *Inclinação:* ${m.headTilt.toFixed(1)}°\n` +
+            `✅ *Confiança:* ${m.confidence}%`;
+        
+        // Add frame measurements if available
+        if (frameMeasurements) {
+            message += `\n\n*Medições com Armação:*\n` +
+                `📏 *Aro OD:* ${frameMeasurements.frameWidthOD} mm\n` +
+                `📏 *Aro OE:* ${frameMeasurements.frameWidthOE} mm\n` +
+                `🔝 *Topo OD:* ${frameMeasurements.topOD.toFixed(1)} mm\n` +
+                `🔝 *Topo OE:* ${frameMeasurements.topOE.toFixed(1)} mm\n` +
+                `👓 *Alt. Pupilar OD:* ${frameMeasurements.heightOD.toFixed(1)} mm\n` +
+                `👓 *Alt. Pupilar OE:* ${frameMeasurements.heightOE.toFixed(1)} mm`;
+        }
+        
+        message += `\n\n_Medidor Óptico By Willian L._`;
+        
+        window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+    }
+
+    // ============ RESET ============
+    function resetApp() {
+        stopCamera();
+        stopFrameCamera();
+        latestLandmarks = null;
+        capturedMeasurements = null;
+        calibrationMode = false;
+        calibrationScale = 1.0;
+        frameMeasurements = null;
+        frameDetectionData = null;
+        document.getElementById('patientName').value = '';
+        document.getElementById('measurementDate').valueAsDate = new Date();
+        document.getElementById('calibrationToggle').textContent = '🎯 Calibrar com Marcador';
+        document.getElementById('calibrationToggle').classList.remove('bg-emerald-500');
+        goToStep(1);
+    }
+
+    // ============ INIT ============
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('measurementDate').valueAsDate = new Date();
+    });
     </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
