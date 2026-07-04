@@ -453,8 +453,13 @@
             const video = document.getElementById('videoElement');
             video.srcObject = videoStream;
             
-            if (currentCameraMode === 'user') video.classList.add('mirror');
-            else video.classList.remove('mirror');
+            if (currentCameraMode === 'user') {
+                video.classList.add('mirror');
+                document.getElementById('overlayCanvas').classList.add('mirror');
+            } else {
+                video.classList.remove('mirror');
+                document.getElementById('overlayCanvas').classList.remove('mirror');
+            }
             
             goToStep(2);
             
@@ -471,22 +476,71 @@
     }
 
     async function toggleCamera() {
+        const previousMode = currentCameraMode;
         currentCameraMode = currentCameraMode === 'user' ? 'environment' : 'user';
         stopCamera();
+        
         try {
             const constraints = {
                 video: { facingMode: currentCameraMode, width: { ideal: 1280 }, height: { ideal: 720 } }
             };
             videoStream = await navigator.mediaDevices.getUserMedia(constraints);
             const video = document.getElementById('videoElement');
+            const overlay = document.getElementById('overlayCanvas');
             video.srcObject = videoStream;
-            if (currentCameraMode === 'user') video.classList.add('mirror');
-            else video.classList.remove('mirror');
-            video.onloadedmetadata = () => startFaceDetection(video);
-            if (video.readyState >= 2) startFaceDetection(video);
+            
+            if (currentCameraMode === 'user') {
+                video.classList.add('mirror');
+                overlay.classList.add('mirror');
+            } else {
+                video.classList.remove('mirror');
+                overlay.classList.remove('mirror');
+            }
+            
+            // Aguardar o vídeo estar pronto antes de iniciar detecção
+            video.onloadedmetadata = () => {
+                startFaceDetection(video);
+            };
+            
+            // Se já estiver pronto, iniciar imediatamente
+            if (video.readyState >= 2) {
+                startFaceDetection(video);
+            }
         } catch (err) {
             console.error('Toggle camera error:', err);
-            currentCameraMode = currentCameraMode === 'user' ? 'environment' : 'user';
+            // Reverter para o modo anterior
+            currentCameraMode = previousMode;
+            
+            // Reiniciar a câmera com o modo anterior
+            try {
+                const constraints = {
+                    video: { facingMode: currentCameraMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+                };
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('videoElement');
+                const overlay = document.getElementById('overlayCanvas');
+                video.srcObject = videoStream;
+                
+                if (currentCameraMode === 'user') {
+                    video.classList.add('mirror');
+                    overlay.classList.add('mirror');
+                } else {
+                    video.classList.remove('mirror');
+                    overlay.classList.remove('mirror');
+                }
+                
+                video.onloadedmetadata = () => {
+                    startFaceDetection(video);
+                };
+                
+                if (video.readyState >= 2) {
+                    startFaceDetection(video);
+                }
+                
+                alert('Não foi possível alternar para a câmera traseira. Mantendo câmera frontal.');
+            } catch (restartErr) {
+                console.error('Failed to restart camera:', restartErr);
+            }
         }
     }
 
@@ -526,39 +580,57 @@
     }
 
     function startFaceDetection(video) {
-        if (mpCamera) mpCamera.stop();
-        mpCamera = new Camera(video, {
-            onFrame: async () => {
-                if (faceMesh && isFaceMeshReady) {
-                    await faceMesh.send({ image: video });
-                }
-            },
-            width: 1280,
-            height: 720
-        });
-        mpCamera.start();
+        if (mpCamera) {
+            mpCamera.stop();
+            mpCamera = null;
+        }
+        
+        try {
+            mpCamera = new Camera(video, {
+                onFrame: async () => {
+                    if (faceMesh && isFaceMeshReady) {
+                        try {
+                            await faceMesh.send({ image: video });
+                        } catch (frameErr) {
+                            console.error('Frame processing error:', frameErr);
+                            // Não parar a câmera em caso de erro de frame
+                        }
+                    }
+                },
+                width: 1280,
+                height: 720
+            });
+            mpCamera.start();
+        } catch (err) {
+            console.error('Error starting face detection:', err);
+        }
     }
 
     // ============ FACE ANALYSIS ============
     function onFaceResults(results) {
-        if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
-            latestLandmarks = null;
-            updateUI_NoFace();
-            return;
-        }
+        try {
+            if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+                latestLandmarks = null;
+                updateUI_NoFace();
+                return;
+            }
 
-        const landmarks = results.multiFaceLandmarks[0];
-        latestLandmarks = landmarks;
-        
-        // Calculate face analysis
-        const analysis = analyzeFace(landmarks);
-        latestConfidence = analysis.confidence;
-        
-        // Draw overlay
-        drawOverlay(landmarks, analysis);
-        
-        // Update UI
-        updateUI_FaceDetected(analysis);
+            const landmarks = results.multiFaceLandmarks[0];
+            latestLandmarks = landmarks;
+            
+            // Calculate face analysis
+            const analysis = analyzeFace(landmarks);
+            latestConfidence = analysis.confidence;
+            
+            // Draw overlay
+            drawOverlay(landmarks, analysis);
+            
+            // Update UI
+            updateUI_FaceDetected(analysis);
+        } catch (err) {
+            console.error('Error in onFaceResults:', err);
+            // Não parar o processamento em caso de erro
+        }
     }
 
     function getLandmarkCenter(landmarks, indices) {
