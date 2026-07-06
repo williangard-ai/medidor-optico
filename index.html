@@ -267,9 +267,14 @@
                                     <span id="qualitySharpness" class="font-bold text-white">--%</span>
                                 </div>
                             </div>
-                            <div class="mt-1">
-                                <span class="text-xs text-slate-400">Frames:</span>
-                                <span id="qualityFrames" class="text-xs font-bold text-white">0</span>
+                            <div class="mt-2">
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-slate-400">Frames coletados:</span>
+                                    <span id="qualityFrames" class="font-bold text-white">0/5</span>
+                                </div>
+                                <div class="w-full bg-slate-700 rounded-full h-2">
+                                    <div id="framesProgressBar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
                             </div>
                         </div>
                         
@@ -284,8 +289,10 @@
                         <strong>Como funciona:</strong>
                         <br>1. Digite o comprimento do aro de cada lente
                         <br>2. O sistema detecta as pupilas automaticamente
-                        <br>3. Calcula a escala usando o tamanho do aro
-                        <br>4. Mede a distância do centro da pupila até a borda inferior
+                        <br>3. Calcule a escala usando o tamanho do aro
+                        <br>4. Meça a distância do centro da pupila até a borda inferior
+                        <br><br>
+                        <strong>⏱️ Tempo de coleta:</strong> Mantenha o dispositivo estável por 3-5 segundos para coletar frames suficientes.
                     </p>
                 </div>
 
@@ -1337,8 +1344,13 @@
         const quality = calculateFrameQuality(analysis, filteredLandmarks);
         analysis.quality = quality;
         
-        // Adiciona ao buffer se a qualidade for boa
-        if (quality.score >= 70) {
+        // Debug: log da qualidade do frame
+        if (frameBuffer.length < 10) {
+            console.log(`Frame quality: ${quality.score.toFixed(0)}% (Pose: ${quality.pose.toFixed(0)}%, Estab: ${quality.stability.toFixed(0)}%, Nitidez: ${quality.sharpness.toFixed(0)}%) - Buffer: ${frameBuffer.length}/5`);
+        }
+        
+        // Adiciona ao buffer se a qualidade for razoável (reduzido de 70% para 50%)
+        if (quality.score >= 50) {
             frameBuffer.push({
                 timestamp: timestamp,
                 analysis: analysis,
@@ -1456,7 +1468,7 @@
     
     // Calcula estabilidade dos últimos frames
     function calculateStability() {
-        if (frameBuffer.length < 5) return 50; // Poucos frames
+        if (frameBuffer.length < 5) return 80; // Poucos frames - assume estabilidade razoável
         
         const recentFrames = frameBuffer.slice(-10);
         const heights = recentFrames.map(f => ({
@@ -1483,31 +1495,36 @@
     
     // Calcula nitidez baseada na detecção de landmarks
     function calculateSharpness(landmarks) {
-        // Verifica se todos os pontos essenciais estão presentes e com boa confiança
+        // Verifica se todos os pontos essenciais estão presentes
         const essentialPoints = [1, 33, 263, 152, 61, 291, ...FRAME_LANDMARKS.LEFT_IRIS, ...FRAME_LANDMARKS.RIGHT_IRIS];
         
         let validPoints = 0;
         let totalConfidence = 0;
         
         essentialPoints.forEach(idx => {
-            if (landmarks[idx] && landmarks[idx].z !== undefined) {
+            if (landmarks[idx] && landmarks[idx].x !== undefined && landmarks[idx].y !== undefined) {
                 validPoints++;
                 // z mais próximo de 0 = melhor detecção
-                const zScore = Math.max(0, 1 - Math.abs(landmarks[idx].z) * 10);
-                totalConfidence += zScore;
+                // Se z não existir ou for NaN, assume confiança média
+                if (landmarks[idx].z !== undefined && !isNaN(landmarks[idx].z)) {
+                    const zScore = Math.max(0, 1 - Math.abs(landmarks[idx].z) * 5);
+                    totalConfidence += zScore;
+                } else {
+                    totalConfidence += 0.7; // Confiança média se z não estiver disponível
+                }
             }
         });
         
         const pointRatio = validPoints / essentialPoints.length;
-        const avgConfidence = totalConfidence / validPoints;
+        const avgConfidence = validPoints > 0 ? totalConfidence / validPoints : 0;
         
         return (pointRatio * 0.5 + avgConfidence * 0.5) * 100;
     }
     
     // Processa buffer de frames e calcula média com rejeição de outliers
     function processFrameBuffer() {
-        if (frameBuffer.length < 10) {
-            return { error: 'Frames insuficientes. Continue segurando o dispositivo estável.' };
+        if (frameBuffer.length < 5) {
+            return { error: `Frames insuficientes (${frameBuffer.length}/5). Continue segurando o dispositivo estável por mais alguns segundos.` };
         }
         
         // Coleta medidas dos últimos 30-60 frames
@@ -1538,6 +1555,12 @@
         const heightOEValues = rejectOutliers(measurements.map(m => m.heightOE));
         const topODValues = rejectOutliers(measurements.map(m => m.topOD));
         const topOEValues = rejectOutliers(measurements.map(m => m.topOE));
+        
+        // Se não houver valores válidos após filtragem, usa todos
+        if (heightODValues.length === 0) heightODValues = measurements.map(m => m.heightOD);
+        if (heightOEValues.length === 0) heightOEValues = measurements.map(m => m.heightOE);
+        if (topODValues.length === 0) topODValues = measurements.map(m => m.topOD);
+        if (topOEValues.length === 0) topOEValues = measurements.map(m => m.topOE);
         
         // Calcula médias
         const avg = (arr) => arr.reduce((sum, v) => sum + v, 0) / arr.length;
@@ -1909,7 +1932,21 @@
             sharpnessEl.className = `font-bold ${analysis.quality.sharpness >= 70 ? 'text-emerald-400' : analysis.quality.sharpness >= 40 ? 'text-amber-400' : 'text-red-400'}`;
             
             // Frames coletados
-            document.getElementById('qualityFrames').textContent = `${frameBuffer.length}/60`;
+            document.getElementById('qualityFrames').textContent = `${frameBuffer.length}/5`;
+            
+            // Atualiza barra de progresso
+            const progressBar = document.getElementById('framesProgressBar');
+            const progress = Math.min(100, (frameBuffer.length / 5) * 100);
+            progressBar.style.width = `${progress}%`;
+            
+            // Muda cor baseado no progresso
+            if (progress >= 100) {
+                progressBar.className = 'bg-emerald-500 h-2 rounded-full transition-all duration-300';
+            } else if (progress >= 60) {
+                progressBar.className = 'bg-blue-500 h-2 rounded-full transition-all duration-300';
+            } else {
+                progressBar.className = 'bg-amber-500 h-2 rounded-full transition-all duration-300';
+            }
         }
     }
 
@@ -1920,7 +1957,7 @@
         const result = processFrameBuffer();
         
         if (result.error) {
-            alert(result.error);
+            alert(result.error + '\n\nDica: Mantenha o dispositivo estável e o rosto bem posicionado por pelo menos 3-5 segundos.');
             return;
         }
         
