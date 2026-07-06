@@ -249,6 +249,30 @@
                         <div class="confidence-bar">
                             <div id="frameConfidenceFill" class="confidence-fill" style="width: 0%; background: #ef4444;"></div>
                         </div>
+                        
+                        <!-- Painel de Qualidade -->
+                        <div id="qualityPanel" class="mt-3 pt-2 border-t border-slate-700 hidden">
+                            <div class="text-xs font-semibold text-slate-300 mb-1">Qualidade do Frame:</div>
+                            <div class="grid grid-cols-3 gap-1 text-xs">
+                                <div>
+                                    <span class="text-slate-400">Pose:</span>
+                                    <span id="qualityPose" class="font-bold text-white">--%</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400">Estab.:</span>
+                                    <span id="qualityStability" class="font-bold text-white">--%</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400">Nitidez:</span>
+                                    <span id="qualitySharpness" class="font-bold text-white">--%</span>
+                                </div>
+                            </div>
+                            <div class="mt-1">
+                                <span class="text-xs text-slate-400">Frames:</span>
+                                <span id="qualityFrames" class="text-xs font-bold text-white">0</span>
+                            </div>
+                        </div>
+                        
                         <div id="frameMeasureInfo" class="text-xs text-slate-400 mt-2 text-center">Aguardando detecção...</div>
                     </div>
                     
@@ -1128,6 +1152,83 @@
     let frameCamera = null;
     let frameMeasurements = null;
     let frameDetectionData = null;
+    
+    // Filtros temporais e coleta de frames
+    let frameBuffer = []; // Buffer para coletar 30-60 frames
+    let oneEuroFilter = {
+        // One Euro Filter parameters
+        minCutoff: 1.0,    // Frequência de corte mínima (suavização)
+        beta: 0.007,       // Coeficiente de velocidade (reduz lag)
+        dCutoff: 1.0,      // Frequência de corte derivada
+        lastTime: null,
+        lastValue: { x: 0, y: 0 },
+        lastDerivative: { x: 0, y: 0 },
+        
+        filter: function(value, timestamp) {
+            if (this.lastTime === null) {
+                this.lastTime = timestamp;
+                this.lastValue = value;
+                return value;
+            }
+            
+            const dt = timestamp - this.lastTime;
+            this.lastTime = timestamp;
+            
+            // Calcula derivada
+            const derivative = {
+                x: (value.x - this.lastValue.x) / dt,
+                y: (value.y - this.lastValue.y) / dt
+            };
+            
+            // Filtro passa-baixa na derivada
+            const ed = 1.0 / (1.0 + this.dCutoff / (2 * Math.PI));
+            const filteredDerivative = {
+                x: ed * derivative.x + (1 - ed) * this.lastDerivative.x,
+                y: ed * derivative.y + (1 - ed) * this.lastDerivative.y
+            };
+            
+            // Cutoff adaptativo
+            const cutoff = this.minCutoff + this.beta * Math.abs(filteredDerivative.x + filteredDerivative.y);
+            const e = 1.0 / (1.0 + cutoff / (2 * Math.PI * dt));
+            
+            // Filtro passa-baixa no valor
+            const filtered = {
+                x: e * value.x + (1 - e) * this.lastValue.x,
+                y: e * value.y + (1 - e) * this.lastValue.y
+            };
+            
+            this.lastValue = filtered;
+            this.lastDerivative = filteredDerivative;
+            
+            return filtered;
+        },
+        
+        reset: function() {
+            this.lastTime = null;
+            this.lastValue = { x: 0, y: 0 };
+            this.lastDerivative = { x: 0, y: 0 };
+        }
+    };
+    
+    // Filtros para cada ponto de interesse
+    let filters = {
+        leftIris: Object.create(oneEuroFilter),
+        rightIris: Object.create(oneEuroFilter),
+        leftEyeTop: Object.create(oneEuroFilter),
+        leftEyeBottom: Object.create(oneEuroFilter),
+        rightEyeTop: Object.create(oneEuroFilter),
+        rightEyeBottom: Object.create(oneEuroFilter)
+    };
+    
+    // Inicializa filtros
+    Object.keys(filters).forEach(key => {
+        filters[key].minCutoff = 1.0;
+        filters[key].beta = 0.007;
+        filters[key].dCutoff = 1.0;
+        filters[key].lastTime = null;
+        filters[key].lastValue = { x: 0, y: 0 };
+        filters[key].lastDerivative = { x: 0, y: 0 };
+    });
 
     // MediaPipe landmarks para contorno dos olhos (usados para detectar bordas da armação)
     const FRAME_LANDMARKS = {
@@ -1224,11 +1325,234 @@
         }
 
         const landmarks = results.multiFaceLandmarks[0];
-        const analysis = analyzeFrameWithFace(landmarks);
+        
+        // Aplica filtro One Euro nos pontos de interesse
+        const timestamp = performance.now() / 1000;
+        const filteredLandmarks = applyTemporalFilters(landmarks, timestamp);
+        
+        // Analisa o frame
+        const analysis = analyzeFrameWithFace(filteredLandmarks);
+        
+        // Calcula qualidade do frame
+        const quality = calculateFrameQuality(analysis, filteredLandmarks);
+        analysis.quality = quality;
+        
+        // Adiciona ao buffer se a qualidade for boa
+        if (quality.score >= 70) {
+            frameBuffer.push({
+                timestamp: timestamp,
+                analysis: analysis,
+                landmarks: filteredLandmarks
+            });
+            
+            // Mantém apenas os últimos 60 frames
+            if (frameBuffer.length > 60) {
+                frameBuffer.shift();
+            }
+        }
+        
         frameDetectionData = analysis;
         
-        drawFrameOverlay(landmarks, analysis);
+        drawFrameOverlay(filteredLandmarks, analysis);
         updateFrameUI_FaceDetected(analysis);
+    }
+    
+    // Aplica filtros temporais One Euro nos landmarks
+    function applyTemporalFilters(landmarks, timestamp) {
+        const filtered = [...landmarks];
+        
+        // Filtra íris esquerda
+        const leftIrisCenter = getLandmarkCenter(landmarks, FRAME_LANDMARKS.LEFT_IRIS);
+        const filteredLeftIris = filters.leftIris.filter(leftIrisCenter, timestamp);
+        // Atualiza todos os pontos da íris esquerda
+        FRAME_LANDMARKS.LEFT_IRIS.forEach(idx => {
+            filtered[idx] = { ...filtered[idx], x: filteredLeftIris.x, y: filteredLeftIris.y };
+        });
+        
+        // Filtra íris direita
+        const rightIrisCenter = getLandmarkCenter(landmarks, FRAME_LANDMARKS.RIGHT_IRIS);
+        const filteredRightIris = filters.rightIris.filter(rightIrisCenter, timestamp);
+        FRAME_LANDMARKS.RIGHT_IRIS.forEach(idx => {
+            filtered[idx] = { ...filtered[idx], x: filteredRightIris.x, y: filteredRightIris.y };
+        });
+        
+        return filtered;
+    }
+    
+    // Calcula qualidade do frame (nitidez, pose, estabilidade)
+    function calculateFrameQuality(analysis, landmarks) {
+        let score = 0;
+        let reasons = [];
+        
+        // 1. Análise de pose (pitch, yaw, roll)
+        const pose = calculateHeadPose(landmarks);
+        const poseScore = calculatePoseScore(pose);
+        score += poseScore * 0.4; // 40% do peso
+        if (poseScore < 70) {
+            reasons.push(`Pose: ${poseScore.toFixed(0)}% (yaw: ${pose.yaw.toFixed(1)}°, pitch: ${pose.pitch.toFixed(1)}°)`);
+        }
+        
+        // 2. Estabilidade (variação dos últimos frames)
+        const stabilityScore = calculateStability();
+        score += stabilityScore * 0.3; // 30% do peso
+        if (stabilityScore < 70) {
+            reasons.push(`Estabilidade: ${stabilityScore.toFixed(0)}%`);
+        }
+        
+        // 3. Nitidez (baseada na detecção de landmarks)
+        const sharpnessScore = calculateSharpness(landmarks);
+        score += sharpnessScore * 0.3; // 30% do peso
+        if (sharpnessScore < 70) {
+            reasons.push(`Nitidez: ${sharpnessScore.toFixed(0)}%`);
+        }
+        
+        return {
+            score: Math.round(score),
+            pose: pose,
+            stability: stabilityScore,
+            sharpness: sharpnessScore,
+            reasons: reasons
+        };
+    }
+    
+    // Calcula pose da cabeça (pitch, yaw, roll)
+    function calculateHeadPose(landmarks) {
+        // Pontos de referência para cálculo de pose
+        const noseTip = landmarks[1];
+        const chin = landmarks[152];
+        const leftEye = landmarks[33];
+        const rightEye = landmarks[263];
+        const leftMouth = landmarks[61];
+        const rightMouth = landmarks[291];
+        
+        // Yaw (rotação horizontal) - baseado na assimetria dos olhos
+        const eyeCenterX = (leftEye.x + rightEye.x) / 2;
+        const noseOffsetX = noseTip.x - eyeCenterX;
+        const eyeDistance = Math.abs(rightEye.x - leftEye.x);
+        const yaw = (noseOffsetX / eyeDistance) * 60; // Aproximadamente em graus
+        
+        // Pitch (rotação vertical) - baseado na posição do nariz em relação aos olhos
+        const eyeCenterY = (leftEye.y + rightEye.y) / 2;
+        const noseOffsetY = noseTip.y - eyeCenterY;
+        const pitch = (noseOffsetY / eyeDistance) * 45;
+        
+        // Roll (inclinação) - baseado na linha dos olhos
+        const eyeAngle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x);
+        const roll = eyeAngle * (180 / Math.PI);
+        
+        return { pitch, yaw, roll };
+    }
+    
+    // Calcula score baseado na pose
+    function calculatePoseScore(pose) {
+        // Pose ideal: yaw ≈ 0°, pitch ≈ 0°, roll ≈ 0°
+        const yawPenalty = Math.min(Math.abs(pose.yaw) * 3, 40);
+        const pitchPenalty = Math.min(Math.abs(pose.pitch) * 3, 30);
+        const rollPenalty = Math.min(Math.abs(pose.roll) * 4, 30);
+        
+        const totalPenalty = yawPenalty + pitchPenalty + rollPenalty;
+        return Math.max(0, 100 - totalPenalty);
+    }
+    
+    // Calcula estabilidade dos últimos frames
+    function calculateStability() {
+        if (frameBuffer.length < 5) return 50; // Poucos frames
+        
+        const recentFrames = frameBuffer.slice(-10);
+        const heights = recentFrames.map(f => ({
+            od: f.analysis.heightOD,
+            oe: f.analysis.heightOE
+        }));
+        
+        // Calcula variância
+        const meanOD = heights.reduce((sum, h) => sum + h.od, 0) / heights.length;
+        const meanOE = heights.reduce((sum, h) => sum + h.oe, 0) / heights.length;
+        
+        const varianceOD = heights.reduce((sum, h) => sum + Math.pow(h.od - meanOD, 2), 0) / heights.length;
+        const varianceOE = heights.reduce((sum, h) => sum + Math.pow(h.oe - meanOE, 2), 0) / heights.length;
+        
+        const stdDevOD = Math.sqrt(varianceOD);
+        const stdDevOE = Math.sqrt(varianceOE);
+        
+        // Score baseado no desvio padrão (menor = mais estável)
+        const maxStdDev = 2.0; // mm de desvio máximo aceitável
+        const stabilityScore = Math.max(0, 100 - ((stdDevOD + stdDevOE) / 2 / maxStdDev) * 100);
+        
+        return stabilityScore;
+    }
+    
+    // Calcula nitidez baseada na detecção de landmarks
+    function calculateSharpness(landmarks) {
+        // Verifica se todos os pontos essenciais estão presentes e com boa confiança
+        const essentialPoints = [1, 33, 263, 152, 61, 291, ...FRAME_LANDMARKS.LEFT_IRIS, ...FRAME_LANDMARKS.RIGHT_IRIS];
+        
+        let validPoints = 0;
+        let totalConfidence = 0;
+        
+        essentialPoints.forEach(idx => {
+            if (landmarks[idx] && landmarks[idx].z !== undefined) {
+                validPoints++;
+                // z mais próximo de 0 = melhor detecção
+                const zScore = Math.max(0, 1 - Math.abs(landmarks[idx].z) * 10);
+                totalConfidence += zScore;
+            }
+        });
+        
+        const pointRatio = validPoints / essentialPoints.length;
+        const avgConfidence = totalConfidence / validPoints;
+        
+        return (pointRatio * 0.5 + avgConfidence * 0.5) * 100;
+    }
+    
+    // Processa buffer de frames e calcula média com rejeição de outliers
+    function processFrameBuffer() {
+        if (frameBuffer.length < 10) {
+            return { error: 'Frames insuficientes. Continue segurando o dispositivo estável.' };
+        }
+        
+        // Coleta medidas dos últimos 30-60 frames
+        const measurements = frameBuffer.slice(-60).map(f => ({
+            heightOD: f.analysis.heightOD,
+            heightOE: f.analysis.heightOE,
+            topOD: f.analysis.topOD,
+            topOE: f.analysis.topOE,
+            lensHeightOD: f.analysis.lensHeightOD,
+            lensHeightOE: f.analysis.lensHeightOE,
+            quality: f.analysis.quality.score
+        }));
+        
+        // Rejeição de outliers usando IQR (Interquartile Range)
+        const rejectOutliers = (values) => {
+            const sorted = [...values].sort((a, b) => a - b);
+            const q1 = sorted[Math.floor(sorted.length * 0.25)];
+            const q3 = sorted[Math.floor(sorted.length * 0.75)];
+            const iqr = q3 - q1;
+            const lowerBound = q1 - 1.5 * iqr;
+            const upperBound = q3 + 1.5 * iqr;
+            
+            return values.filter(v => v >= lowerBound && v <= upperBound);
+        };
+        
+        // Filtra outliers de cada medida
+        const heightODValues = rejectOutliers(measurements.map(m => m.heightOD));
+        const heightOEValues = rejectOutliers(measurements.map(m => m.heightOE));
+        const topODValues = rejectOutliers(measurements.map(m => m.topOD));
+        const topOEValues = rejectOutliers(measurements.map(m => m.topOE));
+        
+        // Calcula médias
+        const avg = (arr) => arr.reduce((sum, v) => sum + v, 0) / arr.length;
+        
+        const result = {
+            heightOD: avg(heightODValues),
+            heightOE: avg(heightOEValues),
+            topOD: avg(topODValues),
+            topOE: avg(topOEValues),
+            framesUsed: heightODValues.length,
+            framesTotal: measurements.length,
+            confidence: avg(measurements.map(m => m.quality))
+        };
+        
+        return result;
     }
 
     function analyzeFrameWithFace(landmarks) {
@@ -1539,9 +1863,11 @@
         const info = document.getElementById('frameMeasureInfo');
         const btn = document.getElementById('frameCaptureBtn');
         
+        // Atualiza confiança principal
         conf.textContent = `${analysis.confidence}%`;
         fill.style.width = `${analysis.confidence}%`;
         
+        // Atualiza status baseado na confiança
         if (analysis.confidence >= 70) {
             status.textContent = '✓ Medição precisa';
             status.className = 'text-sm font-bold text-emerald-400';
@@ -1559,31 +1885,75 @@
             btn.disabled = true;
         }
         
+        // Atualiza informações de medida
         info.textContent = `Aro OD: ${analysis.frameWidthOD}mm | Aro OE: ${analysis.frameWidthOE}mm | Altura OD: ${analysis.heightOD.toFixed(1)}mm | Altura OE: ${analysis.heightOE.toFixed(1)}mm`;
+        
+        // Atualiza painel de qualidade
+        if (analysis.quality) {
+            const qualityPanel = document.getElementById('qualityPanel');
+            qualityPanel.classList.remove('hidden');
+            
+            // Pose
+            const poseEl = document.getElementById('qualityPose');
+            poseEl.textContent = `${analysis.quality.pose.toFixed(0)}%`;
+            poseEl.className = `font-bold ${analysis.quality.pose >= 70 ? 'text-emerald-400' : analysis.quality.pose >= 40 ? 'text-amber-400' : 'text-red-400'}`;
+            
+            // Estabilidade
+            const stabilityEl = document.getElementById('qualityStability');
+            stabilityEl.textContent = `${analysis.quality.stability.toFixed(0)}%`;
+            stabilityEl.className = `font-bold ${analysis.quality.stability >= 70 ? 'text-emerald-400' : analysis.quality.stability >= 40 ? 'text-amber-400' : 'text-red-400'}`;
+            
+            // Nitidez
+            const sharpnessEl = document.getElementById('qualitySharpness');
+            sharpnessEl.textContent = `${analysis.quality.sharpness.toFixed(0)}%`;
+            sharpnessEl.className = `font-bold ${analysis.quality.sharpness >= 70 ? 'text-emerald-400' : analysis.quality.sharpness >= 40 ? 'text-amber-400' : 'text-red-400'}`;
+            
+            // Frames coletados
+            document.getElementById('qualityFrames').textContent = `${frameBuffer.length}/60`;
+        }
     }
 
     function captureFrameMeasurement() {
         if (!frameDetectionData) return;
         
+        // Processa buffer de frames com rejeição de outliers
+        const result = processFrameBuffer();
+        
+        if (result.error) {
+            alert(result.error);
+            return;
+        }
+        
+        // Armazena medidas finais
         frameMeasurements = {
-            heightOD: frameDetectionData.heightOD,
-            heightOE: frameDetectionData.heightOE,
-            topOD: frameDetectionData.topOD,
-            topOE: frameDetectionData.topOE,
-            lensHeightOD: frameDetectionData.lensHeightOD,
-            lensHeightOE: frameDetectionData.lensHeightOE,
-            frameWidthOD: frameDetectionData.frameWidthOD,
-            frameWidthOE: frameDetectionData.frameWidthOE,
-            confidence: frameDetectionData.confidence
+            heightOD: result.heightOD,
+            heightOE: result.heightOE,
+            topOD: result.topOD,
+            topOE: result.topOE,
+            framesUsed: result.framesUsed,
+            framesTotal: result.framesTotal,
+            confidence: result.confidence
         };
         
-        stopFrameCamera();
+        // Reseta filtros e buffer
+        Object.values(filters).forEach(f => f.reset());
+        frameBuffer = [];
         
-        // Display results
-        document.getElementById('frameHeightOD').textContent = frameMeasurements.heightOD.toFixed(1);
-        document.getElementById('frameHeightOE').textContent = frameMeasurements.heightOE.toFixed(1);
-        document.getElementById('frameTopOD').textContent = frameMeasurements.topOD.toFixed(1);
-        document.getElementById('frameTopOE').textContent = frameMeasurements.topOE.toFixed(1);
+        // Exibe resultados
+        document.getElementById('frameHeightOD').textContent = result.heightOD.toFixed(1);
+        document.getElementById('frameHeightOE').textContent = result.heightOE.toFixed(1);
+        document.getElementById('frameTopOD').textContent = result.topOD.toFixed(1);
+        document.getElementById('frameTopOE').textContent = result.topOE.toFixed(1);
+        
+        // Mostra informações de processamento
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'text-xs text-slate-500 mt-2 text-center';
+        infoDiv.textContent = `Média de ${result.framesUsed} frames (de ${result.framesTotal} coletados) • Confiança: ${result.confidence.toFixed(0)}%`;
+        
+        const resultsContainer = document.querySelector('#step6 .bg-white');
+        const existingInfo = resultsContainer.querySelector('.text-xs.text-slate-500.mt-2');
+        if (existingInfo) existingInfo.remove();
+        resultsContainer.appendChild(infoDiv);
         
         goToStep(6);
     }
@@ -1596,6 +1966,16 @@
         const frameOverlayCanvas = document.getElementById('frameOverlayCanvas');
         if (frameOverlayCanvas) {
             frameOverlayCanvas.classList.remove('mirror');
+        }
+        
+        // Resetar buffer e filtros
+        frameBuffer = [];
+        Object.values(filters).forEach(f => f.reset());
+        
+        // Esconder painel de qualidade
+        const qualityPanel = document.getElementById('qualityPanel');
+        if (qualityPanel) {
+            qualityPanel.classList.add('hidden');
         }
     }
 
