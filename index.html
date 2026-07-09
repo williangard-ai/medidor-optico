@@ -765,13 +765,28 @@
         ) * (180 / Math.PI);
         const headTilt = Math.abs(eyeAngle);
         
-        // ============ ENHANCED CONFIDENCE CALCULATION ============
-        const confidenceMetrics = calculateEnhancedConfidence(landmarks, {
-            dpTotal, faceWidthPixels, headTilt, ipdPixels,
-            leftIris, rightIris, noseTip, faceLeft, faceRight, chin, forehead
-        });
+        // Confidence calculation
+        let confidence = 0;
         
-        const confidence = confidenceMetrics.total;
+        // Face must be roughly centered
+        const faceCenterX = (faceLeft.x + faceRight.x) / 2;
+        const faceCenterY = (forehead.y + chin.y) / 2;
+        const centerPenalty = Math.sqrt((faceCenterX - 0.5) ** 2 + (faceCenterY - 0.5) ** 2);
+        confidence += Math.max(0, 30 - centerPenalty * 100);
+        
+        // Face should not be too tilted
+        confidence += Math.max(0, 25 - headTilt * 2);
+        
+        // IPD should be in reasonable range (50-80mm)
+        if (dpTotal >= 50 && dpTotal <= 80) confidence += 25;
+        else if (dpTotal >= 45 && dpTotal <= 85) confidence += 15;
+        else confidence += 5;
+        
+        // Face should occupy reasonable portion of frame
+        if (faceWidthPixels > 0.25 && faceWidthPixels < 0.8) confidence += 20;
+        else confidence += 5;
+        
+        confidence = Math.min(100, Math.round(confidence));
         
         return {
             dpTotal: Math.round(dpTotal * 2) / 2,
@@ -781,166 +796,12 @@
             heightOE: Math.round(heightOE * 10) / 10,
             headTilt: Math.round(headTilt * 10) / 10,
             confidence,
-            confidenceMetrics,
             leftIris, rightIris, noseTip,
             faceLeft, faceRight, chin, forehead,
             leftEyeCenter, rightEyeCenter, noseBottom,
             faceWidthPixels, faceHeightPixels,
             mmPerPixel
         };
-    }
-
-    // ============ ENHANCED CONFIDENCE CALCULATION ============
-    function calculateEnhancedConfidence(landmarks, data) {
-        const metrics = {
-            pose: 0,
-            centering: 0,
-            landmarkQuality: 0,
-            symmetry: 0,
-            distance: 0,
-            stability: 0,
-            total: 0
-        };
-        
-        // 1. POSE QUALITY (25% weight)
-        // Analyze pitch, yaw, roll
-        const pose = calculateHeadPose(landmarks);
-        
-        // Yaw: ideal = 0°, acceptable < 15°
-        const yawScore = Math.max(0, 100 - Math.abs(pose.yaw) * 6.67);
-        
-        // Pitch: ideal = 0°, acceptable < 15°
-        const pitchScore = Math.max(0, 100 - Math.abs(pose.pitch) * 6.67);
-        
-        // Roll: ideal = 0°, acceptable < 10°
-        const rollScore = Math.max(0, 100 - Math.abs(pose.roll) * 10);
-        
-        metrics.pose = (yawScore * 0.4 + pitchScore * 0.4 + rollScore * 0.2);
-        
-        // 2. CENTERING (20% weight)
-        // Face should be centered in frame
-        const faceCenterX = (data.faceLeft.x + data.faceRight.x) / 2;
-        const faceCenterY = (data.forehead.y + data.chin.y) / 2;
-        
-        // Distance from center (0 = perfect, 0.5 = edge)
-        const centerDistance = Math.sqrt(
-            (faceCenterX - 0.5) ** 2 + 
-            (faceCenterY - 0.5) ** 2
-        );
-        
-        // Score: 100 at center, 0 at edges
-        metrics.centering = Math.max(0, 100 - centerDistance * 200);
-        
-        // 3. LANDMARK QUALITY (20% weight)
-        // Check if essential landmarks are present and valid
-        const essentialLandmarks = [
-            ...LANDMARKS.LEFT_IRIS,
-            ...LANDMARKS.RIGHT_IRIS,
-            LANDMARKS.NOSE_TIP,
-            LANDMARKS.LEFT_EYE_TOP,
-            LANDMARKS.LEFT_EYE_BOTTOM,
-            LANDMARKS.RIGHT_EYE_TOP,
-            LANDMARKS.RIGHT_EYE_BOTTOM
-        ];
-        
-        let validLandmarks = 0;
-        let totalZScore = 0;
-        
-        essentialLandmarks.forEach(idx => {
-            const lm = landmarks[idx];
-            if (lm && lm.x !== undefined && lm.y !== undefined) {
-                validLandmarks++;
-                // Z coordinate indicates depth confidence
-                // Lower absolute Z = better confidence
-                if (lm.z !== undefined) {
-                    totalZScore += Math.max(0, 1 - Math.abs(lm.z) * 10);
-                }
-            }
-        });
-        
-        const landmarkPresence = (validLandmarks / essentialLandmarks.length) * 100;
-        const landmarkDepth = totalZScore / validLandmarks * 100;
-        
-        metrics.landmarkQuality = (landmarkPresence * 0.6 + landmarkDepth * 0.4);
-        
-        // 4. SYMMETRY (15% weight)
-        // Compare left and right sides of face
-        const leftEyeWidth = Math.abs(
-            landmarks[LANDMARKS.LEFT_EYE_INNER].x - 
-            landmarks[LANDMARKS.LEFT_EYE_OUTER].x
-        );
-        const rightEyeWidth = Math.abs(
-            landmarks[LANDMARKS.RIGHT_EYE_INNER].x - 
-            landmarks[LANDMARKS.RIGHT_EYE_OUTER].x
-        );
-        
-        const eyeSymmetry = 100 - Math.abs(leftEyeWidth - rightEyeWidth) / 
-                           Math.max(leftEyeWidth, rightEyeWidth) * 100;
-        
-        // Monocular DP symmetry
-        const dpSymmetry = 100 - Math.abs(data.dpOD - data.dpOE) / 
-                          Math.max(data.dpOD, data.dpOE) * 100;
-        
-        metrics.symmetry = (eyeSymmetry * 0.5 + dpSymmetry * 0.5);
-        
-        // 5. DISTANCE (10% weight)
-        // Face should occupy 25-60% of frame width
-        const idealFaceWidth = 0.4; // 40% of frame
-        const distanceDeviation = Math.abs(data.faceWidthPixels - idealFaceWidth);
-        
-        metrics.distance = Math.max(0, 100 - distanceDeviation * 300);
-        
-        // 6. STABILITY (10% weight)
-        // Check if measurements are stable across recent frames
-        // This requires storing recent measurements
-        if (!window.recentMeasurements) {
-            window.recentMeasurements = [];
-        }
-        
-        window.recentMeasurements.push({
-            timestamp: Date.now(),
-            dpTotal: data.dpTotal,
-            headTilt: data.headTilt
-        });
-        
-        // Keep only last 10 measurements
-        if (window.recentMeasurements.length > 10) {
-            window.recentMeasurements.shift();
-        }
-        
-        if (window.recentMeasurements.length >= 3) {
-            const dpValues = window.recentMeasurements.map(m => m.dpTotal);
-            const dpMean = dpValues.reduce((a, b) => a + b, 0) / dpValues.length;
-            const dpVariance = dpValues.reduce((sum, val) => 
-                sum + Math.pow(val - dpMean, 2), 0) / dpValues.length;
-            const dpStdDev = Math.sqrt(dpVariance);
-            
-            // Lower std dev = more stable
-            // Acceptable std dev < 1mm
-            metrics.stability = Math.max(0, 100 - dpStdDev * 100);
-        } else {
-            metrics.stability = 50; // Not enough data yet
-        }
-        
-        // Calculate weighted total
-        metrics.total = Math.round(
-            metrics.pose * 0.25 +
-            metrics.centering * 0.20 +
-            metrics.landmarkQuality * 0.20 +
-            metrics.symmetry * 0.15 +
-            metrics.distance * 0.10 +
-            metrics.stability * 0.10
-        );
-        
-        // Round individual metrics
-        metrics.pose = Math.round(metrics.pose);
-        metrics.centering = Math.round(metrics.centering);
-        metrics.landmarkQuality = Math.round(metrics.landmarkQuality);
-        metrics.symmetry = Math.round(metrics.symmetry);
-        metrics.distance = Math.round(metrics.distance);
-        metrics.stability = Math.round(metrics.stability);
-        
-        return metrics;
     }
 
     function drawOverlay(landmarks, analysis) {
