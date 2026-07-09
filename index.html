@@ -31,6 +31,110 @@
         .measure-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
         .measure-value { font-size: 24px; font-weight: 700; color: #1e293b; }
         .measure-unit { font-size: 14px; color: #94a3b8; margin-left: 2px; }
+        
+        /* AI Guidance Panel */
+        .guidance-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: white;
+            z-index: 20;
+            transition: all 0.3s ease;
+        }
+        .guidance-message {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .guidance-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        .guidance-icon.warning { background: rgba(245, 158, 11, 0.3); }
+        .guidance-icon.success { background: rgba(16, 185, 129, 0.3); }
+        .guidance-icon.info { background: rgba(59, 130, 246, 0.3); }
+        .guidance-submessage {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 4px;
+            margin-left: 42px;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .guidance-panel.capturing .guidance-icon {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        /* Camera Selection Cards */
+        .camera-option {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .camera-option:hover {
+            border-color: #3b82f6;
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.15);
+        }
+        .camera-option:active {
+            transform: translateY(-2px);
+        }
+        .camera-option-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        .camera-option-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        .camera-option-desc {
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+        
+        /* Auto-capture countdown */
+        .auto-capture-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        .auto-capture-fill {
+            height: 100%;
+            background: #10b981;
+            border-radius: 2px;
+            transition: width 0.1s linear;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
@@ -42,26 +146,37 @@
     </header>
 
     <main class="flex-grow p-4 max-w-md mx-auto w-full">
-        <!-- Step 1: Welcome -->
-        <div id="step1" class="step active">
+        <!-- Step 0: Camera Selection -->
+        <div id="step0" class="step active">
             <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-2xl font-bold text-slate-900 mb-4">Medição de Distância Pupilar</h2>
-                <p class="text-slate-600 mb-6">Sistema profissional com detecção facial automática via IA.</p>
+                <h2 class="text-2xl font-bold text-slate-900 mb-2 text-center">Medidor Óptico</h2>
+                <p class="text-slate-600 mb-6 text-center text-sm">Sistema profissional com detecção facial automática via IA.</p>
+                
+                <h3 class="text-sm font-semibold text-slate-900 mb-4 text-center">Selecione o Modo de Captura</h3>
+                
                 <div class="space-y-4 mb-6">
-                    <div class="flex items-start">
-                        <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">1</div>
-                        <p class="text-sm text-slate-700">Preencha os dados do paciente e inicie a medição.</p>
+                    <!-- Câmera Frontal -->
+                    <div class="camera-option" onclick="selectCameraMode('user')">
+                        <div class="camera-option-icon">🤳</div>
+                        <div class="camera-option-title">Câmera Frontal</div>
+                        <div class="camera-option-desc">
+                            Ideal para auto-medição.<br>
+                            Modo espelho ativado para melhor posicionamento.
+                        </div>
                     </div>
-                    <div class="flex items-start">
-                        <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">2</div>
-                        <p class="text-sm text-slate-700">Posicione o rosto na câmera. O sistema detecta automaticamente olhos, nariz e contorno facial.</p>
-                    </div>
-                    <div class="flex items-start">
-                        <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">3</div>
-                        <p class="text-sm text-slate-700">Capture quando a confiança estiver alta. Opcionalmente use um marcador ArUco para calibração de escala.</p>
+                    
+                    <!-- Câmera Traseira -->
+                    <div class="camera-option" onclick="selectCameraMode('environment')">
+                        <div class="camera-option-icon">📷</div>
+                        <div class="camera-option-title">Câmera Traseira</div>
+                        <div class="camera-option-desc">
+                            Ideal para medição assistida.<br>
+                            Outra pessoa pode ajudar no posicionamento.
+                        </div>
                     </div>
                 </div>
-                <div class="border-t border-slate-200 pt-6 mb-6">
+                
+                <div class="border-t border-slate-200 pt-4">
                     <h3 class="text-sm font-semibold text-slate-900 mb-3">Dados do Paciente</h3>
                     <div class="space-y-3">
                         <div>
@@ -74,7 +189,39 @@
                         </div>
                     </div>
                 </div>
-                <button onclick="startCamera()" class="btn-primary">Iniciar Medição</button>
+            </div>
+        </div>
+
+        <!-- Step 1: Instructions -->
+        <div id="step1" class="step">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-2xl font-bold text-slate-900 mb-4">Instruções de Medição</h2>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+                    <p class="text-sm text-blue-800 font-semibold">
+                        📷 Modo selecionado: <span id="selectedCameraMode">-</span>
+                    </p>
+                </div>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">1</div>
+                        <p class="text-sm text-slate-700">Posicione o rosto na câmera. O sistema detecta automaticamente olhos, nariz e contorno facial.</p>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">2</div>
+                        <p class="text-sm text-slate-700">Siga as orientações do guia de IA para ajustar a posição.</p>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mr-3">3</div>
+                        <p class="text-sm text-slate-700">A captura é automática quando a posição estiver perfeita. Você também pode capturar manualmente.</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="goToStep(0)" class="btn-secondary flex-1">Voltar</button>
+                    <button onclick="startCamera()" class="btn-primary flex-1">Iniciar Câmera</button>
+                </div>
             </div>
         </div>
 
@@ -89,6 +236,16 @@
                     <button class="camera-toggle" onclick="toggleCamera()">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </button>
+                    
+                    <!-- AI Guidance Panel -->
+                    <div id="guidancePanel" class="guidance-panel">
+                        <div class="guidance-message">
+                            <div id="guidanceIcon" class="guidance-icon info">👤</div>
+                            <span id="guidanceText">Posicione o rosto na câmera</span>
+                        </div>
+                        <div id="guidanceSubmessage" class="guidance-submessage">Aguardando detecção facial...</div>
+                    </div>
+                    
                     <div class="status-panel">
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-sm font-medium">Status:</span>
@@ -101,6 +258,18 @@
                         <div class="confidence-bar">
                             <div id="confidenceFill" class="confidence-fill" style="width: 0%; background: #ef4444;"></div>
                         </div>
+                        
+                        <!-- Auto-capture progress -->
+                        <div id="autoCaptureSection" class="mt-2 hidden">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-emerald-400 font-semibold">✨ Captura automática em...</span>
+                                <span id="autoCaptureCountdown" class="text-xs font-bold text-emerald-400">2s</span>
+                            </div>
+                            <div class="auto-capture-bar">
+                                <div id="autoCaptureFill" class="auto-capture-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
                         <div id="landmarkInfo" class="text-xs text-slate-400 mt-2 text-center">Inicializando detecção facial...</div>
                     </div>
                     <button class="capture-btn" id="captureBtn" onclick="captureMeasurement()" disabled></button>
@@ -230,7 +399,7 @@
 
     <script>
     // ============ APP STATE ============
-    let currentStep = 1;
+    let currentStep = 0;
     let currentCameraMode = 'user';
     let videoStream = null;
     let mpCamera = null;
@@ -241,6 +410,14 @@
     let calibrationMode = false;
     let calibrationScale = 1.0; // mm per pixel
     let capturedMeasurements = null;
+    
+    // Auto-capture state
+    let autoCaptureEnabled = true;
+    let autoCaptureCounter = 0;
+    let autoCaptureThreshold = 20; // 2 seconds at 10fps
+    let autoCaptureTimer = null;
+    let stableFramesCount = 0;
+    const STABLE_FRAMES_REQUIRED = 20; // Manter posição estável por 2s
 
     // MediaPipe Face Mesh landmark indices
     const LANDMARKS = {
@@ -290,6 +467,14 @@
         document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
         document.getElementById(`step${step}`).classList.add('active');
         currentStep = step;
+    }
+
+    // ============ CAMERA MODE SELECTION ============
+    function selectCameraMode(mode) {
+        currentCameraMode = mode;
+        const modeText = mode === 'user' ? 'Câmera Frontal' : 'Câmera Traseira';
+        document.getElementById('selectedCameraMode').textContent = modeText;
+        goToStep(1);
     }
 
     // ============ CAMERA FUNCTIONS ============
@@ -407,6 +592,7 @@
     function stopCamera() {
         if (mpCamera) { mpCamera.stop(); mpCamera = null; }
         if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+        resetAutoCapture();
     }
 
     function stopCameraAndGoBack() {
@@ -753,6 +939,18 @@
         fill.style.background = '#ef4444';
         info.textContent = 'Posicione o rosto centralizado na câmera';
         btn.disabled = true;
+        
+        // Reset guia
+        const icon = document.getElementById('guidanceIcon');
+        const text = document.getElementById('guidanceText');
+        const submessage = document.getElementById('guidanceSubmessage');
+        const panel = document.getElementById('guidancePanel');
+        
+        icon.textContent = '👤';
+        icon.className = 'guidance-icon info';
+        text.textContent = 'Nenhum rosto detectado';
+        submessage.textContent = 'Posicione o rosto na frente da câmera';
+        panel.classList.remove('capturing');
     }
 
     function updateUI_FaceDetected(analysis) {
@@ -770,30 +968,265 @@
             status.className = 'text-sm font-bold text-emerald-400';
             fill.style.background = '#10b981';
             btn.disabled = false;
+            
+            // Verifica se deve iniciar captura automática
+            if (autoCaptureEnabled && analysis.confidence >= 85) {
+                startAutoCaptureCountdown(analysis);
+            } else {
+                resetAutoCapture();
+            }
         } else if (analysis.confidence >= 40) {
             status.textContent = '⚠ Ajuste a posição';
             status.className = 'text-sm font-bold text-amber-400';
             fill.style.background = '#f59e0b';
             btn.disabled = true;
+            resetAutoCapture();
         } else {
             status.textContent = '✗ Posição incorreta';
             status.className = 'text-sm font-bold text-red-400';
             fill.style.background = '#ef4444';
             btn.disabled = true;
+            resetAutoCapture();
         }
         
         info.textContent = `DP: ${analysis.dpTotal}mm | Inclinação: ${analysis.headTilt}° | OD: ${analysis.dpOD}mm | OE: ${analysis.dpOE}mm`;
+        
+        // Atualiza guia de IA
+        updateGuidance(analysis);
+    }
+
+    // ============ AUTO-CAPTURE SYSTEM ============
+    function startAutoCaptureCountdown(analysis) {
+        stableFramesCount++;
+        
+        const autoCaptureSection = document.getElementById('autoCaptureSection');
+        const autoCaptureFill = document.getElementById('autoCaptureFill');
+        const autoCaptureCountdown = document.getElementById('autoCaptureCountdown');
+        
+        // Mostra seção de captura automática
+        autoCaptureSection.classList.remove('hidden');
+        
+        // Calcula progresso
+        const progress = Math.min(100, (stableFramesCount / STABLE_FRAMES_REQUIRED) * 100);
+        autoCaptureFill.style.width = `${progress}%`;
+        
+        // Calcula tempo restante
+        const remainingTime = Math.ceil((STABLE_FRAMES_REQUIRED - stableFramesCount) / 10);
+        autoCaptureCountdown.textContent = `${remainingTime}s`;
+        
+        // Se atingiu o threshold, captura automaticamente
+        if (stableFramesCount >= STABLE_FRAMES_REQUIRED) {
+            autoCaptureMeasurement(analysis);
+        }
+    }
+
+    function resetAutoCapture() {
+        stableFramesCount = 0;
+        const autoCaptureSection = document.getElementById('autoCaptureSection');
+        const autoCaptureFill = document.getElementById('autoCaptureFill');
+        
+        autoCaptureSection.classList.add('hidden');
+        autoCaptureFill.style.width = '0%';
+    }
+
+    function autoCaptureMeasurement(analysis) {
+        // Mostra mensagem de captura
+        showCapturingGuidance();
+        
+        // Desabilita captura automática temporariamente
+        autoCaptureEnabled = false;
+        
+        // Aguarda um momento para o usuário ver a mensagem
+        setTimeout(() => {
+            const finalAnalysis = analyzeFace(latestLandmarks);
+            capturedMeasurements = finalAnalysis;
+            
+            stopCamera();
+            showValidation(finalAnalysis);
+            
+            // Reabilita captura automática após 2 segundos
+            setTimeout(() => {
+                autoCaptureEnabled = true;
+            }, 2000);
+        }, 800);
+    }
+
+    // ============ HEAD POSE CALCULATION ============
+    function calculateHeadPose(landmarks) {
+        if (!landmarks) return { pitch: 0, yaw: 0, roll: 0 };
+        
+        // Pontos de referência para cálculo de pose
+        const noseTip = landmarks[1];
+        const chin = landmarks[152];
+        const leftEye = landmarks[33];
+        const rightEye = landmarks[263];
+        const forehead = landmarks[10];
+        
+        // Yaw (rotação horizontal) - baseado na posição do nariz em relação aos olhos
+        const eyeCenterX = (leftEye.x + rightEye.x) / 2;
+        const eyeWidth = Math.abs(rightEye.x - leftEye.x);
+        const noseOffsetX = noseTip.x - eyeCenterX;
+        const yaw = (noseOffsetX / eyeWidth) * 60; // Aproximadamente em graus
+        
+        // Pitch (rotação vertical) - baseado na posição do nariz em relação à testa/queixo
+        const faceHeight = Math.abs(chin.y - forehead.y);
+        const eyeCenterY = (leftEye.y + rightEye.y) / 2;
+        const noseOffsetY = noseTip.y - eyeCenterY;
+        const pitch = (noseOffsetY / faceHeight) * 45; // Aproximadamente em graus
+        
+        // Roll (inclinação) - baseado na linha dos olhos
+        const eyeAngle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x);
+        const roll = eyeAngle * (180 / Math.PI);
+        
+        return { pitch, yaw, roll };
+    }
+
+    // ============ AI GUIDANCE SYSTEM ============
+    function updateGuidance(analysis) {
+        const panel = document.getElementById('guidancePanel');
+        const icon = document.getElementById('guidanceIcon');
+        const text = document.getElementById('guidanceText');
+        const submessage = document.getElementById('guidanceSubmessage');
+        
+        // Calcula pose (yaw, pitch, roll)
+        const pose = calculateHeadPose(latestLandmarks);
+        
+        // Calcula tamanho do rosto (distância)
+        const faceSize = analysis.faceWidthPixels;
+        
+        // Determina a mensagem mais prioritária
+        let guidance = {
+            icon: '👤',
+            iconClass: 'info',
+            message: 'Posicione o rosto na câmera',
+            submessage: 'Aguardando posicionamento ideal...',
+            capturing: false
+        };
+        
+        // Prioridade 1: Rosto muito longe
+        if (faceSize < 0.25) {
+            guidance = {
+                icon: '📏',
+                iconClass: 'warning',
+                message: 'Aproxime o rosto',
+                submessage: 'Mantenha o rosto a 30-40cm da câmera',
+                capturing: false
+            };
+        }
+        // Prioridade 2: Rosto muito perto
+        else if (faceSize > 0.6) {
+            guidance = {
+                icon: '↔️',
+                iconClass: 'warning',
+                message: 'Afaste um pouco o rosto',
+                submessage: 'Mantenha o rosto a 30-40cm da câmera',
+                capturing: false
+            };
+        }
+        // Prioridade 3: Cabeça virada (yaw)
+        else if (Math.abs(pose.yaw) > 15) {
+            const direction = pose.yaw > 0 ? 'direita' : 'esquerda';
+            guidance = {
+                icon: '👁️',
+                iconClass: 'warning',
+                message: 'Olhe para frente',
+                submessage: `Gire a cabeça um pouco para a ${direction === 'direita' ? 'esquerda' : 'direita'}`,
+                capturing: false
+            };
+        }
+        // Prioridade 4: Cabeça muito baixa (pitch negativo)
+        else if (pose.pitch < -10) {
+            guidance = {
+                icon: '⬆️',
+                iconClass: 'warning',
+                message: 'Levante um pouco a cabeça',
+                submessage: 'Olhe diretamente para a câmera',
+                capturing: false
+            };
+        }
+        // Prioridade 5: Cabeça muito alta (pitch positivo)
+        else if (pose.pitch > 10) {
+            guidance = {
+                icon: '⬇️',
+                iconClass: 'warning',
+                message: 'Abaixe um pouco a cabeça',
+                submessage: 'Olhe diretamente para a câmera',
+                capturing: false
+            };
+        }
+        // Prioridade 6: Cabeça inclinada (roll)
+        else if (Math.abs(pose.roll) > 10) {
+            const direction = pose.roll > 0 ? 'direita' : 'esquerda';
+            guidance = {
+                icon: '🔄',
+                iconClass: 'warning',
+                message: 'Endireite a cabeça',
+                submessage: `Incline a cabeça para a ${direction === 'direita' ? 'esquerda' : 'direita'}`,
+                capturing: false
+            };
+        }
+        // Prioridade 7: Tudo correto - pronto para capturar
+        else if (analysis.confidence >= 70) {
+            guidance = {
+                icon: '✨',
+                iconClass: 'success',
+                message: 'Excelente! Posição perfeita',
+                submessage: 'Toque no botão para capturar a medição',
+                capturing: false
+            };
+        }
+        // Prioridade 8: Quase lá
+        else if (analysis.confidence >= 40) {
+            guidance = {
+                icon: '👌',
+                iconClass: 'info',
+                message: 'Quase lá! Ajuste fino',
+                submessage: 'Centralize o rosto e olhe para a câmera',
+                capturing: false
+            };
+        }
+        
+        // Atualiza UI
+        icon.textContent = guidance.icon;
+        icon.className = `guidance-icon ${guidance.iconClass}`;
+        text.textContent = guidance.message;
+        submessage.textContent = guidance.submessage;
+        
+        if (guidance.capturing) {
+            panel.classList.add('capturing');
+        } else {
+            panel.classList.remove('capturing');
+        }
+    }
+    
+    function showCapturingGuidance() {
+        const panel = document.getElementById('guidancePanel');
+        const icon = document.getElementById('guidanceIcon');
+        const text = document.getElementById('guidanceText');
+        const submessage = document.getElementById('guidanceSubmessage');
+        
+        icon.textContent = '📸';
+        icon.className = 'guidance-icon success';
+        text.textContent = 'Excelente, capturando...';
+        submessage.textContent = 'Mantenha a posição por um momento';
+        panel.classList.add('capturing');
     }
 
     // ============ CAPTURE & MEASUREMENT ============
     function captureMeasurement() {
         if (!latestLandmarks || !latestConfidence) return;
         
-        const analysis = analyzeFace(latestLandmarks);
-        capturedMeasurements = analysis;
+        // Mostra mensagem de captura
+        showCapturingGuidance();
         
-        stopCamera();
-        showValidation(analysis);
+        // Aguarda um momento para o usuário ver a mensagem
+        setTimeout(() => {
+            const analysis = analyzeFace(latestLandmarks);
+            capturedMeasurements = analysis;
+            
+            stopCamera();
+            showValidation(analysis);
+        }, 800);
     }
 
     function showValidation(analysis) {
@@ -1012,11 +1445,14 @@
         capturedMeasurements = null;
         calibrationMode = false;
         calibrationScale = 1.0;
+        autoCaptureEnabled = true;
+        stableFramesCount = 0;
+        resetAutoCapture();
         document.getElementById('patientName').value = '';
         document.getElementById('measurementDate').valueAsDate = new Date();
         document.getElementById('calibrationToggle').textContent = '🎯 Calibrar com Marcador';
         document.getElementById('calibrationToggle').classList.remove('bg-emerald-500');
-        goToStep(1);
+        goToStep(0);
     }
 
     // ============ INIT ============
