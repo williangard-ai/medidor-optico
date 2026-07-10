@@ -666,6 +666,13 @@
             
             // Calculate face analysis
             const analysis = analyzeFace(landmarks);
+            
+            // Debug log
+            if (!analysis || analysis.confidence === undefined || isNaN(analysis.confidence)) {
+                console.error('❌ analyzeFace retornou valor inválido:', analysis);
+                return;
+            }
+            
             latestConfidence = analysis.confidence;
             
             // Draw overlay
@@ -690,118 +697,135 @@
     }
 
     function analyzeFace(landmarks) {
-        // Get key points
-        const leftIris = getLandmarkCenter(landmarks, LANDMARKS.LEFT_IRIS);
-        const rightIris = getLandmarkCenter(landmarks, LANDMARKS.RIGHT_IRIS);
-        const noseTip = landmarks[LANDMARKS.NOSE_TIP];
-        const faceLeft = landmarks[LANDMARKS.FACE_LEFT];
-        const faceRight = landmarks[LANDMARKS.FACE_RIGHT];
-        const chin = landmarks[LANDMARKS.CHIN];
-        const forehead = landmarks[LANDMARKS.FOREHEAD];
-        
-        // Calculate pixel distances (normalized 0-1)
-        const ipdPixels = Math.sqrt(
-            (leftIris.x - rightIris.x) ** 2 + 
-            (leftIris.y - rightIris.y) ** 2
-        );
-        
-        const faceWidthPixels = Math.sqrt(
-            (faceLeft.x - faceRight.x) ** 2 + 
-            (faceLeft.y - faceRight.y) ** 2
-        );
-        
-        const faceHeightPixels = Math.sqrt(
-            (forehead.x - chin.x) ** 2 + 
-            (forehead.y - chin.y) ** 2
-        );
-        
-        // Estimate scale using average face width
-        // If no ArUco calibration, use anthropometric average
-        let mmPerPixel;
-        if (calibrationMode && calibrationScale !== 1.0) {
-            mmPerPixel = calibrationScale;
-        } else {
-            mmPerPixel = AVG_FACE_WIDTH / faceWidthPixels;
+        try {
+            // Get key points
+            const leftIris = getLandmarkCenter(landmarks, LANDMARKS.LEFT_IRIS);
+            const rightIris = getLandmarkCenter(landmarks, LANDMARKS.RIGHT_IRIS);
+            const noseTip = landmarks[LANDMARKS.NOSE_TIP];
+            const faceLeft = landmarks[LANDMARKS.FACE_LEFT];
+            const faceRight = landmarks[LANDMARKS.FACE_RIGHT];
+            const chin = landmarks[LANDMARKS.CHIN];
+            const forehead = landmarks[LANDMARKS.FOREHEAD];
+            
+            // Calculate pixel distances (normalized 0-1)
+            const ipdPixels = Math.sqrt(
+                (leftIris.x - rightIris.x) ** 2 + 
+                (leftIris.y - rightIris.y) ** 2
+            );
+            
+            const faceWidthPixels = Math.sqrt(
+                (faceLeft.x - faceRight.x) ** 2 + 
+                (faceLeft.y - faceRight.y) ** 2
+            );
+            
+            const faceHeightPixels = Math.sqrt(
+                (forehead.x - chin.x) ** 2 + 
+                (forehead.y - chin.y) ** 2
+            );
+            
+            // Estimate scale using average face width
+            // If no ArUco calibration, use anthropometric average
+            let mmPerPixel;
+            if (calibrationMode && calibrationScale !== 1.0) {
+                mmPerPixel = calibrationScale;
+            } else {
+                mmPerPixel = AVG_FACE_WIDTH / faceWidthPixels;
+            }
+            
+            // Calculate measurements in mm
+            const dpTotal = ipdPixels * mmPerPixel;
+            
+            // Monocular DP (distance from face center to each iris)
+            // Face center is the midpoint between the two pupils
+            const faceCenterPupil = {
+                x: (leftIris.x + rightIris.x) / 2,
+                y: (leftIris.y + rightIris.y) / 2
+            };
+            
+            const dpOD = Math.sqrt(
+                (faceCenterPupil.x - rightIris.x) ** 2 + 
+                (faceCenterPupil.y - rightIris.y) ** 2
+            ) * mmPerPixel;
+            
+            const dpOE = Math.sqrt(
+                (faceCenterPupil.x - leftIris.x) ** 2 + 
+                (faceCenterPupil.y - leftIris.y) ** 2
+            ) * mmPerPixel;
+            
+            // Pupillary height (distance from eye center to nose bottom reference)
+            const noseBottom = landmarks[LANDMARKS.NOSE_BOTTOM];
+            const leftEyeCenter = {
+                x: (landmarks[LANDMARKS.LEFT_EYE_TOP].x + landmarks[LANDMARKS.LEFT_EYE_BOTTOM].x) / 2,
+                y: (landmarks[LANDMARKS.LEFT_EYE_TOP].y + landmarks[LANDMARKS.LEFT_EYE_BOTTOM].y) / 2
+            };
+            const rightEyeCenter = {
+                x: (landmarks[LANDMARKS.RIGHT_EYE_TOP].x + landmarks[LANDMARKS.RIGHT_EYE_BOTTOM].x) / 2,
+                y: (landmarks[LANDMARKS.RIGHT_EYE_TOP].y + landmarks[LANDMARKS.RIGHT_EYE_BOTTOM].y) / 2
+            };
+            
+            const heightOD = Math.abs(leftEyeCenter.y - noseBottom.y) * mmPerPixel;
+            const heightOE = Math.abs(rightEyeCenter.y - noseBottom.y) * mmPerPixel;
+            
+            // Head tilt (angle between eye line and horizontal)
+            const eyeAngle = Math.atan2(
+                leftIris.y - rightIris.y,
+                leftIris.x - rightIris.x
+            ) * (180 / Math.PI);
+            const headTilt = Math.abs(eyeAngle);
+            
+            // Confidence calculation
+            let confidence = 0;
+            
+            // Face must be roughly centered
+            const faceCenterX = (faceLeft.x + faceRight.x) / 2;
+            const faceCenterY = (forehead.y + chin.y) / 2;
+            const centerPenalty = Math.sqrt((faceCenterX - 0.5) ** 2 + (faceCenterY - 0.5) ** 2);
+            confidence += Math.max(0, 30 - centerPenalty * 100);
+            
+            // Face should not be too tilted
+            confidence += Math.max(0, 25 - headTilt * 2);
+            
+            // IPD should be in reasonable range (50-80mm)
+            if (dpTotal >= 50 && dpTotal <= 80) confidence += 25;
+            else if (dpTotal >= 45 && dpTotal <= 85) confidence += 15;
+            else confidence += 5;
+            
+            // Face should occupy reasonable portion of frame
+            if (faceWidthPixels > 0.25 && faceWidthPixels < 0.8) confidence += 20;
+            else confidence += 5;
+            
+            confidence = Math.min(100, Math.round(confidence));
+            
+            // Debug log
+            console.log('✅ Confiança calculada:', confidence, '%');
+            
+            return {
+                dpTotal: Math.round(dpTotal * 2) / 2,
+                dpOD: Math.round(dpOD * 2) / 2,
+                dpOE: Math.round(dpOE * 2) / 2,
+                heightOD: Math.round(heightOD * 10) / 10,
+                heightOE: Math.round(heightOE * 10) / 10,
+                headTilt: Math.round(headTilt * 10) / 10,
+                confidence,
+                leftIris, rightIris, noseTip,
+                faceLeft, faceRight, chin, forehead,
+                leftEyeCenter, rightEyeCenter, noseBottom,
+                faceWidthPixels, faceHeightPixels,
+                mmPerPixel
+            };
+        } catch (err) {
+            console.error('❌ Erro em analyzeFace:', err);
+            return {
+                dpTotal: 0,
+                dpOD: 0,
+                dpOE: 0,
+                heightOD: 0,
+                heightOE: 0,
+                headTilt: 0,
+                confidence: 0,
+                faceWidthPixels: 0
+            };
         }
-        
-        // Calculate measurements in mm
-        const dpTotal = ipdPixels * mmPerPixel;
-        
-        // Monocular DP (distance from face center to each iris)
-        // Face center is the midpoint between the two pupils
-        const faceCenterPupil = {
-            x: (leftIris.x + rightIris.x) / 2,
-            y: (leftIris.y + rightIris.y) / 2
-        };
-        
-        const dpOD = Math.sqrt(
-            (faceCenterPupil.x - rightIris.x) ** 2 + 
-            (faceCenterPupil.y - rightIris.y) ** 2
-        ) * mmPerPixel;
-        
-        const dpOE = Math.sqrt(
-            (faceCenterPupil.x - leftIris.x) ** 2 + 
-            (faceCenterPupil.y - leftIris.y) ** 2
-        ) * mmPerPixel;
-        
-        // Pupillary height (distance from eye center to nose bottom reference)
-        const noseBottom = landmarks[LANDMARKS.NOSE_BOTTOM];
-        const leftEyeCenter = {
-            x: (landmarks[LANDMARKS.LEFT_EYE_TOP].x + landmarks[LANDMARKS.LEFT_EYE_BOTTOM].x) / 2,
-            y: (landmarks[LANDMARKS.LEFT_EYE_TOP].y + landmarks[LANDMARKS.LEFT_EYE_BOTTOM].y) / 2
-        };
-        const rightEyeCenter = {
-            x: (landmarks[LANDMARKS.RIGHT_EYE_TOP].x + landmarks[LANDMARKS.RIGHT_EYE_BOTTOM].x) / 2,
-            y: (landmarks[LANDMARKS.RIGHT_EYE_TOP].y + landmarks[LANDMARKS.RIGHT_EYE_BOTTOM].y) / 2
-        };
-        
-        const heightOD = Math.abs(leftEyeCenter.y - noseBottom.y) * mmPerPixel;
-        const heightOE = Math.abs(rightEyeCenter.y - noseBottom.y) * mmPerPixel;
-        
-        // Head tilt (angle between eye line and horizontal)
-        const eyeAngle = Math.atan2(
-            leftIris.y - rightIris.y,
-            leftIris.x - rightIris.x
-        ) * (180 / Math.PI);
-        const headTilt = Math.abs(eyeAngle);
-        
-        // Confidence calculation
-        let confidence = 0;
-        
-        // Face must be roughly centered
-        const faceCenterX = (faceLeft.x + faceRight.x) / 2;
-        const faceCenterY = (forehead.y + chin.y) / 2;
-        const centerPenalty = Math.sqrt((faceCenterX - 0.5) ** 2 + (faceCenterY - 0.5) ** 2);
-        confidence += Math.max(0, 30 - centerPenalty * 100);
-        
-        // Face should not be too tilted
-        confidence += Math.max(0, 25 - headTilt * 2);
-        
-        // IPD should be in reasonable range (50-80mm)
-        if (dpTotal >= 50 && dpTotal <= 80) confidence += 25;
-        else if (dpTotal >= 45 && dpTotal <= 85) confidence += 15;
-        else confidence += 5;
-        
-        // Face should occupy reasonable portion of frame
-        if (faceWidthPixels > 0.25 && faceWidthPixels < 0.8) confidence += 20;
-        else confidence += 5;
-        
-        confidence = Math.min(100, Math.round(confidence));
-        
-        return {
-            dpTotal: Math.round(dpTotal * 2) / 2,
-            dpOD: Math.round(dpOD * 2) / 2,
-            dpOE: Math.round(dpOE * 2) / 2,
-            heightOD: Math.round(heightOD * 10) / 10,
-            heightOE: Math.round(heightOE * 10) / 10,
-            headTilt: Math.round(headTilt * 10) / 10,
-            confidence,
-            leftIris, rightIris, noseTip,
-            faceLeft, faceRight, chin, forehead,
-            leftEyeCenter, rightEyeCenter, noseBottom,
-            faceWidthPixels, faceHeightPixels,
-            mmPerPixel
-        };
     }
 
     function drawOverlay(landmarks, analysis) {
@@ -959,6 +983,14 @@
         const fill = document.getElementById('confidenceFill');
         const info = document.getElementById('landmarkInfo');
         const btn = document.getElementById('captureBtn');
+        
+        // Debug log
+        console.log('📊 updateUI_FaceDetected chamada com confidence:', analysis.confidence);
+        
+        if (!conf || !fill || !status) {
+            console.error('❌ Elementos HTML não encontrados');
+            return;
+        }
         
         conf.textContent = `${analysis.confidence}%`;
         fill.style.width = `${analysis.confidence}%`;
