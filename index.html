@@ -402,7 +402,6 @@
     let currentStep = 0;
     let currentCameraMode = 'user';
     let videoStream = null;
-    let mpCamera = null;
     let faceMesh = null;
     let isFaceMeshReady = false;
     let latestLandmarks = null;
@@ -478,22 +477,58 @@
     }
 
     // ============ CAMERA FUNCTIONS ============
+    let availableCameras = [];
+    
+    async function getAvailableCameras() {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            availableCameras = devices.filter(device => device.kind === 'videoinput');
+            console.log('📷 Câmeras disponíveis:', availableCameras.length);
+            availableCameras.forEach((cam, idx) => {
+                console.log(`  ${idx}: ${cam.label || 'Câmera ' + (idx + 1)}`);
+            });
+            return availableCameras;
+        } catch (err) {
+            console.error('Erro ao listar câmeras:', err);
+            return [];
+        }
+    }
+    
     async function startCamera() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert('Seu navegador não suporta acesso à câmera. Use Chrome ou Safari.');
             return;
         }
+        
         try {
+            // Listar câmeras disponíveis
+            await getAvailableCameras();
+            
             // Initialize MediaPipe Face Mesh first
             await initFaceMesh();
             
+            // Selecionar a câmera correta
+            let selectedCameraId = null;
+            
+            if (currentCameraMode === 'environment' && availableCameras.length > 1) {
+                // Tentar encontrar câmera traseira
+                // Em geral, a segunda câmera é a traseira em dispositivos móveis
+                selectedCameraId = availableCameras[1].deviceId;
+                console.log('📷 Usando câmera traseira:', selectedCameraId);
+            } else if (availableCameras.length > 0) {
+                // Usar câmera frontal (primeira câmera)
+                selectedCameraId = availableCameras[0].deviceId;
+                console.log('📷 Usando câmera frontal:', selectedCameraId);
+            }
+            
             const constraints = {
                 video: {
-                    facingMode: currentCameraMode,
+                    deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
                 }
             };
+            
             videoStream = await navigator.mediaDevices.getUserMedia(constraints);
             const video = document.getElementById('videoElement');
             video.srcObject = videoStream;
@@ -521,14 +556,35 @@
     }
 
     async function toggleCamera() {
+        console.log('🔄 Alternando câmera...');
         const previousMode = currentCameraMode;
         currentCameraMode = currentCameraMode === 'user' ? 'environment' : 'user';
+        
         stopCamera();
         
         try {
+            // Atualizar lista de câmeras
+            await getAvailableCameras();
+            
+            // Selecionar a câmera correta
+            let selectedCameraId = null;
+            
+            if (currentCameraMode === 'environment' && availableCameras.length > 1) {
+                selectedCameraId = availableCameras[1].deviceId;
+                console.log('📷 Alternando para câmera traseira:', selectedCameraId);
+            } else if (availableCameras.length > 0) {
+                selectedCameraId = availableCameras[0].deviceId;
+                console.log('📷 Alternando para câmera frontal:', selectedCameraId);
+            }
+            
             const constraints = {
-                video: { facingMode: currentCameraMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+                video: {
+                    deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
             };
+            
             videoStream = await navigator.mediaDevices.getUserMedia(constraints);
             const video = document.getElementById('videoElement');
             const overlay = document.getElementById('overlayCanvas');
@@ -551,6 +607,8 @@
             if (video.readyState >= 2) {
                 startFaceDetection(video);
             }
+            
+            console.log('✅ Câmera alternada com sucesso');
         } catch (err) {
             console.error('Toggle camera error:', err);
             // Reverter para o modo anterior
@@ -558,9 +616,23 @@
             
             // Reiniciar a câmera com o modo anterior
             try {
+                await getAvailableCameras();
+                
+                let selectedCameraId = null;
+                if (currentCameraMode === 'environment' && availableCameras.length > 1) {
+                    selectedCameraId = availableCameras[1].deviceId;
+                } else if (availableCameras.length > 0) {
+                    selectedCameraId = availableCameras[0].deviceId;
+                }
+                
                 const constraints = {
-                    video: { facingMode: currentCameraMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+                    video: {
+                        deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
                 };
+                
                 videoStream = await navigator.mediaDevices.getUserMedia(constraints);
                 const video = document.getElementById('videoElement');
                 const overlay = document.getElementById('overlayCanvas');
@@ -590,9 +662,20 @@
     }
 
     function stopCamera() {
-        if (mpCamera) { mpCamera.stop(); mpCamera = null; }
-        if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+        // Parar loop de processamento de frames
+        if (window.faceDetectionLoop) {
+            cancelAnimationFrame(window.faceDetectionLoop);
+            window.faceDetectionLoop = null;
+        }
+        
+        // Parar stream de vídeo
+        if (videoStream) { 
+            videoStream.getTracks().forEach(t => t.stop()); 
+            videoStream = null; 
+        }
+        
         resetAutoCapture();
+        console.log('🛑 Câmera parada');
     }
 
     function stopCameraAndGoBack() {
@@ -626,30 +709,31 @@
     }
 
     function startFaceDetection(video) {
-        if (mpCamera) {
-            mpCamera.stop();
-            mpCamera = null;
+        console.log('🎥 Iniciando detecção facial...');
+        
+        // Parar detecção anterior se existir
+        if (window.faceDetectionLoop) {
+            cancelAnimationFrame(window.faceDetectionLoop);
+            window.faceDetectionLoop = null;
         }
         
-        try {
-            mpCamera = new Camera(video, {
-                onFrame: async () => {
-                    if (faceMesh && isFaceMeshReady) {
-                        try {
-                            await faceMesh.send({ image: video });
-                        } catch (frameErr) {
-                            console.error('Frame processing error:', frameErr);
-                            // Não parar a câmera em caso de erro de frame
-                        }
-                    }
-                },
-                width: 1280,
-                height: 720
-            });
-            mpCamera.start();
-        } catch (err) {
-            console.error('Error starting face detection:', err);
+        // Função para processar frames manualmente
+        async function processFrame() {
+            if (faceMesh && isFaceMeshReady && video.readyState >= 2) {
+                try {
+                    await faceMesh.send({ image: video });
+                } catch (frameErr) {
+                    console.error('Frame processing error:', frameErr);
+                }
+            }
+            
+            // Continuar processando frames
+            window.faceDetectionLoop = requestAnimationFrame(processFrame);
         }
+        
+        // Iniciar loop de processamento
+        processFrame();
+        console.log('✅ Detecção facial iniciada');
     }
 
     // ============ FACE ANALYSIS ============
