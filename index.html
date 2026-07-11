@@ -1121,13 +1121,14 @@
         fill.style.width = `${analysis.confidence}%`;
         
         if (analysis.confidence >= 70) {
-            status.textContent = '✓ Rosto detectado';
-            status.className = 'text-sm font-bold text-emerald-400';
-            fill.style.background = '#10b981';
-            btn.disabled = false;
+            document.getElementById('faceStatus').textContent = '✓ Rosto detectado';
+            document.getElementById('faceStatus').className = 'text-sm font-bold text-emerald-400';
+            document.getElementById('confidenceValue').textContent = analysis.confidence + '%';
+            document.getElementById('confidenceFill').style.width = analysis.confidence + '%';
+            document.getElementById('captureBtn').disabled = false;
             
-            // Verifica se deve iniciar captura automática
-            if (autoCaptureEnabled && analysis.confidence >= 85) {
+            // Verifica se deve iniciar captura automática (threshold de 75%)
+            if (autoCaptureEnabled && analysis.confidence >= 75) {
                 startAutoCaptureCountdown(analysis);
             } else {
                 resetAutoCapture();
@@ -1323,13 +1324,13 @@
             };
         }
         // Prioridade 7: Tudo correto - pronto para capturar
-        else if (analysis.confidence >= 70) {
+        else if (analysis.confidence >= 75) {
             guidance = {
                 icon: '✨',
                 iconClass: 'success',
                 message: 'Excelente! Posição perfeita',
-                submessage: 'Toque no botão para capturar a medição',
-                capturing: false
+                submessage: 'Captura automática ativada',
+                capturing: true
             };
         }
         // Prioridade 8: Quase lá
