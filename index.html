@@ -857,31 +857,72 @@
             ) * (180 / Math.PI);
             const headTilt = Math.abs(eyeAngle);
             
-            // Confidence calculation
+            // Enhanced confidence calculation with multiple factors
             let confidence = 0;
+            const confidenceDetails = {};
             
-            // Face must be roughly centered
+            // 1. Face centering (25 points max)
             const faceCenterX = (faceLeft.x + faceRight.x) / 2;
             const faceCenterY = (forehead.y + chin.y) / 2;
             const centerPenalty = Math.sqrt((faceCenterX - 0.5) ** 2 + (faceCenterY - 0.5) ** 2);
-            confidence += Math.max(0, 30 - centerPenalty * 100);
+            const centeringScore = Math.max(0, 25 - centerPenalty * 80);
+            confidence += centeringScore;
+            confidenceDetails.centering = Math.round(centeringScore);
             
-            // Face should not be too tilted
-            confidence += Math.max(0, 25 - headTilt * 2);
+            // 2. Head tilt (20 points max)
+            const tiltScore = Math.max(0, 20 - headTilt * 1.5);
+            confidence += tiltScore;
+            confidenceDetails.tilt = Math.round(tiltScore);
             
-            // IPD should be in reasonable range (50-80mm)
-            if (dpTotal >= 50 && dpTotal <= 80) confidence += 25;
-            else if (dpTotal >= 45 && dpTotal <= 85) confidence += 15;
-            else confidence += 5;
+            // 3. IPD range (20 points max)
+            let ipdScore = 0;
+            if (dpTotal >= 50 && dpTotal <= 80) ipdScore = 20;
+            else if (dpTotal >= 45 && dpTotal <= 85) ipdScore = 15;
+            else if (dpTotal >= 40 && dpTotal <= 90) ipdScore = 10;
+            else ipdScore = 5;
+            confidence += ipdScore;
+            confidenceDetails.ipd = ipdScore;
             
-            // Face should occupy reasonable portion of frame
-            if (faceWidthPixels > 0.25 && faceWidthPixels < 0.8) confidence += 20;
-            else confidence += 5;
+            // 4. Face size in frame (20 points max)
+            let faceSizeScore = 0;
+            if (faceWidthPixels > 0.25 && faceWidthPixels < 0.7) faceSizeScore = 20;
+            else if (faceWidthPixels > 0.20 && faceWidthPixels < 0.8) faceSizeScore = 15;
+            else if (faceWidthPixels > 0.15 && faceWidthPixels < 0.9) faceSizeScore = 10;
+            else faceSizeScore = 5;
+            confidence += faceSizeScore;
+            confidenceDetails.faceSize = faceSizeScore;
+            
+            // 5. Landmark quality (15 points max)
+            // Check if all essential landmarks are present
+            const essentialLandmarks = [
+                ...LANDMARKS.LEFT_IRIS,
+                ...LANDMARKS.RIGHT_IRIS,
+                LANDMARKS.NOSE_TIP,
+                LANDMARKS.LEFT_EYE_TOP,
+                LANDMARKS.LEFT_EYE_BOTTOM,
+                LANDMARKS.RIGHT_EYE_TOP,
+                LANDMARKS.RIGHT_EYE_BOTTOM
+            ];
+            let validLandmarks = 0;
+            essentialLandmarks.forEach(idx => {
+                if (landmarks[idx] && landmarks[idx].x !== undefined && landmarks[idx].y !== undefined) {
+                    validLandmarks++;
+                }
+            });
+            const landmarkScore = (validLandmarks / essentialLandmarks.length) * 15;
+            confidence += landmarkScore;
+            confidenceDetails.landmarks = Math.round(landmarkScore);
+            
+            // Bonus for perfect conditions (+10 points)
+            if (centeringScore >= 20 && tiltScore >= 18 && ipdScore === 20 && faceSizeScore === 20) {
+                confidence += 10;
+                confidenceDetails.bonus = 10;
+            }
             
             confidence = Math.min(100, Math.round(confidence));
             
             // Debug log
-            console.log('✅ Confiança calculada:', confidence, '%');
+            console.log('✅ Confiança calculada:', confidence, '%', confidenceDetails);
             
             return {
                 dpTotal: Math.round(dpTotal * 2) / 2,
