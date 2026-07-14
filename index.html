@@ -314,11 +314,11 @@
 
                 <div class="grid grid-cols-2 gap-3 mb-3">
                     <div class="measure-card">
-                        <div class="measure-label">DP Monocular OD</div>
+                        <div class="measure-label">DNP Monocular OD</div>
                         <div><span id="dpOD" class="measure-value text-blue-600">--</span><span class="measure-unit">mm</span></div>
                     </div>
                     <div class="measure-card">
-                        <div class="measure-label">DP Monocular OE</div>
+                        <div class="measure-label">DNP Monocular OE</div>
                         <div><span id="dpOE" class="measure-value text-blue-600">--</span><span class="measure-unit">mm</span></div>
                     </div>
                 </div>
@@ -373,7 +373,7 @@
                         <div><p class="text-xs text-slate-500">Confiança</p><p id="resultConfidence" class="text-lg font-bold text-emerald-600">--%</p></div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div><p class="text-xs text-slate-500">DP OD / OE</p><p id="resultDPMono" class="text-sm font-bold text-slate-700">-- / -- mm</p></div>
+                        <div><p class="text-xs text-slate-500">DNP OD / OE</p><p id="resultDPMono" class="text-sm font-bold text-slate-700">-- / -- mm</p></div>
                         <div><p class="text-xs text-slate-500">Altura OD / OE</p><p id="resultHeight" class="text-sm font-bold text-slate-700">-- / -- mm</p></div>
                     </div>
                 </div>
@@ -819,22 +819,12 @@
             // Calculate measurements in mm
             const dpTotal = ipdPixels * mmPerPixel;
             
-            // Monocular DP (distance from face center to each iris)
-            // Face center is the midpoint between the two pupils
-            const faceCenterPupil = {
-                x: (leftIris.x + rightIris.x) / 2,
-                y: (leftIris.y + rightIris.y) / 2
-            };
+            // DNP - Distância Naso Pupilar (horizontal distance from each pupil to nose center)
+            // DNP OD (Right): horizontal distance from right pupil to nose
+            const dnpOD = Math.abs(noseTip.x - rightIris.x) * mmPerPixel;
             
-            const dpOD = Math.sqrt(
-                (faceCenterPupil.x - rightIris.x) ** 2 + 
-                (faceCenterPupil.y - rightIris.y) ** 2
-            ) * mmPerPixel;
-            
-            const dpOE = Math.sqrt(
-                (faceCenterPupil.x - leftIris.x) ** 2 + 
-                (faceCenterPupil.y - leftIris.y) ** 2
-            ) * mmPerPixel;
+            // DNP OE (Left): horizontal distance from left pupil to nose
+            const dnpOE = Math.abs(noseTip.x - leftIris.x) * mmPerPixel;
             
             // Pupillary height (distance from eye center to nose bottom reference)
             const noseBottom = landmarks[LANDMARKS.NOSE_BOTTOM];
@@ -847,8 +837,8 @@
                 y: (landmarks[LANDMARKS.RIGHT_EYE_TOP].y + landmarks[LANDMARKS.RIGHT_EYE_BOTTOM].y) / 2
             };
             
-            const heightOD = Math.abs(leftEyeCenter.y - noseBottom.y) * mmPerPixel;
-            const heightOE = Math.abs(rightEyeCenter.y - noseBottom.y) * mmPerPixel;
+            const heightOD = Math.abs(rightEyeCenter.y - noseBottom.y) * mmPerPixel;
+            const heightOE = Math.abs(leftEyeCenter.y - noseBottom.y) * mmPerPixel;
             
             // Head tilt (angle between eye line and horizontal)
             const eyeAngle = Math.atan2(
@@ -923,11 +913,13 @@
             
             // Debug log
             console.log('✅ Confiança calculada:', confidence, '%', confidenceDetails);
+            console.log('📏 DP Total:', dpTotal.toFixed(1), 'mm | DNP OD:', dnpOD.toFixed(1), 'mm | DNP OE:', dnpOE.toFixed(1), 'mm');
+            console.log('📐 Relação DNP/DP:', (dnpOD/dpTotal*100).toFixed(0), '% /', (dnpOE/dpTotal*100).toFixed(0), '%');
             
             return {
                 dpTotal: Math.round(dpTotal * 2) / 2,
-                dpOD: Math.round(dpOD * 2) / 2,
-                dpOE: Math.round(dpOE * 2) / 2,
+                dnpOD: Math.round(dnpOD * 2) / 2,
+                dnpOE: Math.round(dnpOE * 2) / 2,
                 heightOD: Math.round(heightOD * 10) / 10,
                 heightOE: Math.round(heightOE * 10) / 10,
                 headTilt: Math.round(headTilt * 10) / 10,
@@ -942,8 +934,8 @@
             console.error('❌ Erro em analyzeFace:', err);
             return {
                 dpTotal: 0,
-                dpOD: 0,
-                dpOE: 0,
+                dnpOD: 0,
+                dnpOE: 0,
                 heightOD: 0,
                 heightOE: 0,
                 headTilt: 0,
@@ -1046,31 +1038,47 @@
         ctx.textAlign = 'center';
         ctx.fillText(`${analysis.dpTotal} mm`, midX, midY + 5);
         
-        // Draw monocular lines (face center to each iris)
-        const faceCenter = {
-            x: ((analysis.leftIris.x + analysis.rightIris.x) / 2) * w,
-            y: ((analysis.leftIris.y + analysis.rightIris.y) / 2) * h
-        };
-        
-        // Draw center point
+        // Draw DNP lines (pupil to nose tip)
+        // Draw DNP OD (right pupil to nose)
         ctx.beginPath();
-        ctx.arc(faceCenter.x, faceCenter.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(139, 92, 246, 0.8)';
-        ctx.fill();
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.moveTo(faceCenter.x, faceCenter.y);
-        ctx.lineTo(analysis.leftIris.x * w, analysis.leftIris.y * h);
-        ctx.moveTo(faceCenter.x, faceCenter.y);
-        ctx.lineTo(analysis.rightIris.x * w, analysis.rightIris.y * h);
-        ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([3, 3]);
+        ctx.moveTo(analysis.rightIris.x * w, analysis.rightIris.y * h);
+        ctx.lineTo(nose.x * w, nose.y * h);
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
         ctx.stroke();
         ctx.setLineDash([]);
+        
+        // Draw DNP OE (left pupil to nose)
+        ctx.beginPath();
+        ctx.moveTo(analysis.leftIris.x * w, analysis.leftIris.y * h);
+        ctx.lineTo(nose.x * w, nose.y * h);
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Draw DNP values
+        const dnpODMidX = ((analysis.rightIris.x + nose.x) / 2) * w;
+        const dnpODMidY = ((analysis.rightIris.y + nose.y) / 2) * h;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.roundRect(dnpODMidX - 30, dnpODMidY - 10, 60, 20, 4);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`DNP OD: ${analysis.dnpOD}mm`, dnpODMidX, dnpODMidY + 4);
+        
+        const dnpOEMidX = ((analysis.leftIris.x + nose.x) / 2) * w;
+        const dnpOEMidY = ((analysis.leftIris.y + nose.y) / 2) * h;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.roundRect(dnpOEMidX - 30, dnpOEMidY - 10, 60, 20, 4);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`DNP OE: ${analysis.dnpOE}mm`, dnpOEMidX, dnpOEMidY + 4);
     }
 
     // ============ UI UPDATES ============
@@ -1147,7 +1155,7 @@
             resetAutoCapture();
         }
         
-        info.textContent = `DP: ${analysis.dpTotal}mm | Inclinação: ${analysis.headTilt}° | OD: ${analysis.dpOD}mm | OE: ${analysis.dpOE}mm`;
+        info.textContent = `DP: ${analysis.dpTotal}mm | Inclinação: ${analysis.headTilt}° | DNP OD: ${analysis.dnpOD}mm | DNP OE: ${analysis.dnpOE}mm`;
         
         // Atualiza guia de IA
         updateGuidance(analysis);
@@ -1389,8 +1397,8 @@
 
     function showValidation(analysis) {
         document.getElementById('dpTotal').textContent = analysis.dpTotal.toFixed(1);
-        document.getElementById('dpOD').textContent = analysis.dpOD.toFixed(1);
-        document.getElementById('dpOE').textContent = analysis.dpOE.toFixed(1);
+        document.getElementById('dpOD').textContent = analysis.dnpOD.toFixed(1);
+        document.getElementById('dpOE').textContent = analysis.dnpOE.toFixed(1);
         document.getElementById('heightOD').textContent = analysis.heightOD.toFixed(1);
         document.getElementById('heightOE').textContent = analysis.heightOE.toFixed(1);
         document.getElementById('headTilt').textContent = analysis.headTilt.toFixed(1);
@@ -1423,7 +1431,7 @@
         document.getElementById('resultDate').textContent = date;
         document.getElementById('resultDPTotal').textContent = `${m.dpTotal.toFixed(1)} mm`;
         document.getElementById('resultConfidence').textContent = `${m.confidence}%`;
-        document.getElementById('resultDPMono').textContent = `${m.dpOD.toFixed(1)} / ${m.dpOE.toFixed(1)} mm`;
+        document.getElementById('resultDPMono').textContent = `${m.dnpOD.toFixed(1)} / ${m.dnpOE.toFixed(1)} mm`;
         document.getElementById('resultHeight').textContent = `${m.heightOD.toFixed(1)} / ${m.heightOE.toFixed(1)} mm`;
         
         goToStep(5);
@@ -1585,8 +1593,8 @@
             `👤 *Paciente:* ${name}\n` +
             `📅 *Data:* ${date}\n\n` +
             `📏 *DP Total:* ${m.dpTotal.toFixed(1)} mm\n` +
-            `👁 *DP OD:* ${m.dpOD.toFixed(1)} mm\n` +
-            `👁 *DP OE:* ${m.dpOE.toFixed(1)} mm\n` +
+            `👁 *DNP OD:* ${m.dnpOD.toFixed(1)} mm\n` +
+            `👁 *DNP OE:* ${m.dnpOE.toFixed(1)} mm\n` +
             `📐 *Altura OD:* ${m.heightOD.toFixed(1)} mm\n` +
             `📐 *Altura OE:* ${m.heightOE.toFixed(1)} mm\n` +
             `🔄 *Inclinação:* ${m.headTilt.toFixed(1)}°\n` +
